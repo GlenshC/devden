@@ -1,0 +1,111 @@
+@page "/board"
+
+<PageTitle>Board — DevDen</PageTitle>
+
+<div class="board-page">
+    <div class="board-header">
+        <h1>DEN — DevDen</h1>
+        <button class="btn-primary">+ New Item</button>
+    </div>
+
+    <div class="board-columns">
+        <div class="board-column">
+            <div class="column-header">
+                <span class="column-name">Backlog</span>
+                <span class="column-count">3</span>
+            </div>
+
+            <div class="item-card">
+                <div class="item-key">DEN-1</div>
+                <div class="item-title">Set up project structure and routing</div>
+                <div class="item-meta">
+                    <span class="priority-dot p2"></span>
+                    <span class="item-type">Task</span>
+                </div>
+            </div>
+
+            <div class="item-card">
+                <div class="item-key">DEN-2</div>
+                <div class="item-title">Design data models for projects and items</div>
+                <div class="item-meta">
+                    <span class="priority-dot p1"></span>
+                    <span class="item-type">Feature</span>
+                </div>
+            </div>
+
+            <div class="item-card">
+                <div class="item-key">DEN-3</div>
+                <div class="item-title">Research localStorage vs IndexedDB for persistence</div>
+                <div class="item-meta">
+                    <span class="priority-dot p3"></span>
+                    <span class="item-type">Chore</span>
+                </div>
+            </div>
+
+            <button class="btn-add-item">+ Add item</button>
+        </div>
+
+        <div class="board-column">
+            <div class="column-header">
+                <span class="column-name">In Progress</span>
+                <span class="column-count">2</span>
+            </div>
+
+            <div class="item-card">
+                <div class="item-key">DEN-4</div>
+                <div class="item-title">Build kanban board UI with static data</div>
+                <div class="item-meta">
+                    <span class="priority-dot p1"></span>
+                    <span class="item-type">Feature</span>
+                </div>
+            </div>
+
+            <div class="item-card">
+                <div class="item-key">DEN-5</div>
+                <div class="item-title">Write plain CSS design tokens</div>
+                <div class="item-meta">
+                    <span class="priority-dot p2"></span>
+                    <span class="item-type">Chore</span>
+                </div>
+            </div>
+
+            <button class="btn-add-item">+ Add item</button>
+        </div>
+
+        <div class="board-column">
+            <div class="column-header">
+                <span class="column-name">Review</span>
+                <span class="column-count">1</span>
+            </div>
+
+            <div class="item-card">
+                <div class="item-key">DEN-6</div>
+                <div class="item-title">Verify Blazor WASM build output and asset pipeline</div>
+                <div class="item-meta">
+                    <span class="priority-dot p0"></span>
+                    <span class="item-type">Bug</span>
+                </div>
+            </div>
+
+            <button class="btn-add-item">+ Add item</button>
+        </div>
+
+        <div class="board-column">
+            <div class="column-header">
+                <span class="column-name">Done</span>
+                <span class="column-count">1</span>
+            </div>
+
+            <div class="item-card done">
+                <div class="item-key">DEN-0</div>
+                <div class="item-title">Bootstrap Blazor WASM project</div>
+                <div class="item-meta">
+                    <span class="priority-dot p3"></span>
+                    <span class="item-type">Chore</span>
+                </div>
+            </div>
+
+            <button class="btn-add-item">+ Add item</button>
+        </div>
+    </div>
+</div>
