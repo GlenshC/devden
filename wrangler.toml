@@ -1,0 +1,23 @@
+name = "devden"
+compatibility_date = "2024-01-01"
+
+# Cloudflare Pages-style static site
+[site]
+bucket = "output/wwwroot"
+
+# Cache control for static assets (immutable = cached forever)
+[[headers]]
+pattern = "*/_framework/*.wasm"
+"Cache-Control" = "public, max-age=31536000, immutable"
+
+[[headers]]
+pattern = "*/_framework/*.js"
+"Cache-Control" = "public, max-age=31536000, immutable"
+
+[[headers]]
+pattern = "*/_framework/*.br"
+"Cache-Control" = "public, max-age=31536000, immutable"
+
+[[headers]]
+pattern = "*/_framework/*.gz"
+"Cache-Control" = "public, max-age=31536000, immutable"

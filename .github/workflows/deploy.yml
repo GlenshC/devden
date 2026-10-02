@@ -7,6 +7,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 30  # AOT compilation takes 5-15 minutes (vs 30 sec normal build)
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

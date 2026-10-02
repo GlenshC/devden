@@ -14,6 +14,12 @@
 
     <!-- Force pre-compressed .br and .gz generation -->
     <BlazorEnableCompression>true</BlazorEnableCompression>
+
+    <!-- AOT Compilation: bundles 40 framework assemblies into ~5-10 files -->
+    <RunAOTCompilation>true</RunAOTCompilation>
+
+    <!-- Strip IL after AOT to reduce bundle size by ~15-20% -->
+    <WasmStripIL>true</WasmStripIL>
   </PropertyGroup>
 
   <ItemGroup>
@@ -24,8 +30,8 @@
 
   <!-- Correct ItemGroup element placement to prevent stripping DevDen pages/routes -->
   <ItemGroup>
-    <TrimmingRootAssembly Include="DevDen" />
-    <TrimmingRootAssembly Include="Markdig" />
+    <TrimmerRootAssembly Include="DevDen" />
+    <TrimmerRootAssembly Include="Markdig" />
   </ItemGroup>
 
   <!-- Enforce Tailwind v3 execution during Release build -->
