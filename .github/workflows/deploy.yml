@@ -17,6 +17,9 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Install WASM Workload
+        run: dotnet workload restore
+
       - name: Publish Blazor WASM
         run: dotnet publish -c Release -o output
 
