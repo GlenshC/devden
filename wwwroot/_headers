@@ -1,0 +1,8 @@
+/_framework/*
+  Access-Control-Allow-Origin: *
+
+/*.wasm
+  Content-Type: application/wasm
+
+/*.js
+  Content-Type: application/javascript

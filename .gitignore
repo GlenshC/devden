@@ -4,3 +4,4 @@ obj/
 *.user
 wwwroot/css/app.css
 node_modules/
+/output
