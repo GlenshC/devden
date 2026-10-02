@@ -6,19 +6,16 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <ServiceWorkerAssetsManifest>service-worker-assets.js</ServiceWorkerAssetsManifest>
     <PublishTrimmed>true</PublishTrimmed>
-    <TrimMode>partial</TrimMode>
+    <TrimmingRootAssembly Include="DevDen" />
     <InvariantGlobalization>true</InvariantGlobalization>
     <BlazorEnableCompression>true</BlazorEnableCompression>
+    <WasmEnableWebcil>true</WasmEnableWebcil>
   </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.13" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.13" PrivateAssets="all" />
     <PackageReference Include="Markdig" Version="0.40.0" />
-  </ItemGroup>
-  <ItemGroup>
-    <TrimmableAssembly Include="DevDen" IsTrimmable="false" />
-    <TrimmableAssembly Include="Markdig" IsTrimmable="false" />
-    <TrimmableAssembly Include="Microsoft.AspNetCore.Components.Routing" IsTrimmable="false" />
   </ItemGroup>
   <Target Name="BuildTailwind" BeforeTargets="BeforeBuild" Condition="'$(Configuration)' == 'Release'">
     <Exec Command="npx tailwindcss@3 -i ./wwwroot/css/tailwind.input.css -o ./wwwroot/css/app.css --minify" ContinueOnError="true" />
