@@ -5,11 +5,15 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ServiceWorkerAssetsManifest>service-worker-assets.js</ServiceWorkerAssetsManifest>
+
+    <!-- Enable IL Trimming for framework BCL -->
     <PublishTrimmed>true</PublishTrimmed>
-    <TrimmingRootAssembly Include="DevDen" />
+
+    <!-- Strip heavy ICU globalization data -->
     <InvariantGlobalization>true</InvariantGlobalization>
+
+    <!-- Force pre-compressed .br and .gz generation -->
     <BlazorEnableCompression>true</BlazorEnableCompression>
-    <WasmEnableWebcil>true</WasmEnableWebcil>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,6 +21,14 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.13" PrivateAssets="all" />
     <PackageReference Include="Markdig" Version="0.40.0" />
   </ItemGroup>
+
+  <!-- Correct ItemGroup element placement to prevent stripping DevDen pages/routes -->
+  <ItemGroup>
+    <TrimmingRootAssembly Include="DevDen" />
+    <TrimmingRootAssembly Include="Markdig" />
+  </ItemGroup>
+
+  <!-- Enforce Tailwind v3 execution during Release build -->
   <Target Name="BuildTailwind" BeforeTargets="BeforeBuild" Condition="'$(Configuration)' == 'Release'">
     <Exec Command="npx tailwindcss@3 -i ./wwwroot/css/tailwind.input.css -o ./wwwroot/css/app.css --minify" ContinueOnError="true" />
   </Target>
