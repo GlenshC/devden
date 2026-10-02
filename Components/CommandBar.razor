@@ -1,0 +1,293 @@
+@inject AppState AppState
+@inject CommandDispatcher Dispatcher
+@inject ItemService ItemService
+@inject IDataStore DataStore
+@inject ToastService Toast
+@inject IJSRuntime JS
+@implements IDisposable
+
+@if (AppState.IsCommandBarOpen)
+{
+    <!-- Backdrop -->
+    <div class="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] px-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-150"
+         @onclick="Close">
+        <!-- Command Bar Modal -->
+        <div class="glass-panel w-full max-w-xl shadow-2xl border border-hairline overflow-hidden rounded-panel animate-in zoom-in-95 duration-100"
+             @onclick:stopPropagation="true">
+            <!-- Search Input Header -->
+            <div class="flex items-center gap-3 px-4 py-3 border-b border-white/10 bg-white/[0.02]">
+                <span class="text-coral font-bold text-sm">✦</span>
+                <input id="command-bar-input"
+                       type="text"
+                       class="w-full bg-transparent text-sm text-fg placeholder:text-muted/50 focus:outline-none"
+                       placeholder="Type a command or search... (# items, @@ projects)"
+                       value="@_query"
+                       @oninput="HandleInput"
+                       @onkeydown="HandleKeyDown" />
+                <span class="kbd-chip text-[10px]">ESC</span>
+            </div>
+
+            <!-- Mode Selector Pill Bar -->
+            <div class="flex items-center gap-2 px-4 py-1.5 bg-white/[0.01] border-b border-white/5 text-[11px] font-mono text-muted">
+                <span class="@(_mode == SearchMode.Command ? "text-coral font-bold" : "opacity-60")">Commands</span>
+                <span>·</span>
+                <span class="@(_mode == SearchMode.Item ? "text-coral font-bold" : "opacity-60")"># Items</span>
+                <span>·</span>
+                <span class="@(_mode == SearchMode.Project ? "text-coral font-bold" : "opacity-60")">@@ Projects</span>
+            </div>
+
+            <!-- Results List -->
+            <div class="max-h-72 overflow-y-auto p-1.5 space-y-0.5">
+                @if (_results.Count == 0)
+                {
+                    <div class="py-8 text-center text-xs text-muted">
+                        No matching results for "@_query"
+                    </div>
+                }
+                else
+                {
+                    @for (int i = 0; i < _results.Count; i++)
+                    {
+                        var index = i;
+                        var item = _results[i];
+                        var isActive = index == _activeIndex;
+
+                        <button type="button"
+                                class="w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between transition-all @(isActive ? "bg-crimson/10 ring-1 ring-crimson/30 text-white" : "text-fg/80 hover:bg-white/5 hover:text-white")"
+                                @onclick="() => ExecuteResult(item)"
+                                @onmouseover="() => _activeIndex = index">
+                            <div class="flex items-center gap-2.5 overflow-hidden">
+                                <span class="text-xs opacity-70">@item.Icon</span>
+                                <div class="flex items-center gap-2 truncate">
+                                    <span class="font-medium truncate">@item.Title</span>
+                                    @if (!string.IsNullOrEmpty(item.Subtitle))
+                                    {
+                                        <span class="text-xs text-muted truncate">@item.Subtitle</span>
+                                    }
+                                </div>
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(item.Shortcut))
+                            {
+                                <span class="kbd-chip text-[10px]">@item.Shortcut</span>
+                            }
+                        </button>
+                    }
+                }
+            </div>
+
+            <!-- Footer Hints -->
+            <div class="flex items-center justify-between px-4 py-2 border-t border-white/10 bg-white/[0.02] text-[11px] font-mono text-muted/60">
+                <span>↑↓ navigate · enter open · esc dismiss</span>
+                <span>DevDen Launcher</span>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private enum SearchMode { Command, Item, Project }
+
+    private record CommandItem(
+        string Id,
+        string Title,
+        string? Subtitle,
+        string Icon,
+        string? Shortcut,
+        Action Action
+    );
+
+    private string _query = "";
+    private SearchMode _mode = SearchMode.Command;
+    private List<CommandItem> _results = new();
+    private int _activeIndex = 0;
+
+    protected override void OnInitialized()
+    {
+        AppState.OnChange += HandleStateChanged;
+    }
+
+    private void HandleStateChanged()
+    {
+        if (AppState.IsCommandBarOpen)
+        {
+            _query = "";
+            _activeIndex = 0;
+            UpdateResults();
+            _ = JS.InvokeVoidAsync("denUtils.focusElement", "command-bar-input");
+        }
+        StateHasChanged();
+    }
+
+    private void HandleInput(ChangeEventArgs e)
+    {
+        _query = e.Value?.ToString() ?? "";
+        _activeIndex = 0;
+        UpdateResults();
+    }
+
+    private void UpdateResults()
+    {
+        var raw = _query.Trim();
+        var search = raw;
+
+        if (raw.StartsWith("#"))
+        {
+            _mode = SearchMode.Item;
+            search = raw[1..].Trim();
+        }
+        else if (raw.StartsWith("@"))
+        {
+            _mode = SearchMode.Project;
+            search = raw[1..].Trim();
+        }
+        else
+        {
+            _mode = SearchMode.Command;
+        }
+
+        var list = new List<CommandItem>();
+
+        if (_mode == SearchMode.Command)
+        {
+            // Core Commands
+            list.Add(new("cmd-new", "Create New Item", "Add task or bug to active project", "＋", "C", () =>
+            {
+                Close();
+                Dispatcher.TriggerNewItem();
+            }));
+
+            list.Add(new("cmd-board", "Go to Kanban Board", "View board columns", "📋", "G B", () =>
+            {
+                Close();
+                Dispatcher.GoToBoard();
+            }));
+
+            list.Add(new("cmd-list", "Go to List View", "Dense table with filters", "📑", "G L", () =>
+            {
+                Close();
+                Dispatcher.GoToList();
+            }));
+
+            list.Add(new("cmd-roadmap", "Go to Roadmap", "Milestones and progress", "🎯", "G R", () =>
+            {
+                Close();
+                Dispatcher.GoToRoadmap();
+            }));
+
+            list.Add(new("cmd-today", "Go to Today Focus", "Personal cross-project daily list", "⚡", "G T", () =>
+            {
+                Close();
+                Dispatcher.GoToToday();
+            }));
+
+            list.Add(new("cmd-settings", "Open Settings", "Manage statuses, labels and backup", "⚙", null, () =>
+            {
+                Close();
+                Dispatcher.GoToSettings();
+            }));
+
+            list.Add(new("cmd-export", "Export All Data (JSON)", "Download full local backup", "💾", null, async () =>
+            {
+                Close();
+                var json = await DataStore.ExportAsync();
+                await JS.InvokeVoidAsync("denUtils.downloadJson", $"devden-backup-{DateTime.UtcNow:yyyyMMdd-HHmmss}.json", json);
+                Toast.ShowSuccess("Data export downloaded");
+            }));
+
+            // Filter by search query if any
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                list = list.Where(c => c.Title.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                                       (c.Subtitle?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false))
+                           .ToList();
+            }
+        }
+        else if (_mode == SearchMode.Item)
+        {
+            // Search all items in current project
+            var activeItems = AppState.ActiveItems;
+            var key = AppState.ActiveProject?.Key ?? "DEN";
+
+            var matched = activeItems
+                .Where(i => string.IsNullOrWhiteSpace(search) ||
+                            i.Title.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                            $"{key}-{i.Number}".Contains(search, StringComparison.OrdinalIgnoreCase))
+                .Take(8);
+
+            foreach (var it in matched)
+            {
+                list.Add(new($"item-{it.Id}", $"{key}-{it.Number} {it.Title}", it.Priority.ToString(), "•", null, () =>
+                {
+                    Close();
+                    AppState.SetSelectedItem(it);
+                }));
+            }
+        }
+        else if (_mode == SearchMode.Project)
+        {
+            // Switch projects
+            var projects = AppState.Projects
+                .Where(p => string.IsNullOrWhiteSpace(search) ||
+                            p.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                            p.Key.Contains(search, StringComparison.OrdinalIgnoreCase))
+                .Take(8);
+
+            foreach (var p in projects)
+            {
+                list.Add(new($"proj-{p.Id}", p.Name, p.Key, "📁", null, () =>
+                {
+                    Close();
+                    Dispatcher.SwitchProject(p.Id);
+                }));
+            }
+        }
+
+        _results = list.Take(8).ToList();
+        if (_activeIndex >= _results.Count) _activeIndex = Math.Max(0, _results.Count - 1);
+    }
+
+    private void HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "ArrowDown")
+        {
+            if (_results.Count > 0)
+            {
+                _activeIndex = (_activeIndex + 1) % _results.Count;
+            }
+        }
+        else if (e.Key == "ArrowUp")
+        {
+            if (_results.Count > 0)
+            {
+                _activeIndex = (_activeIndex - 1 + _results.Count) % _results.Count;
+            }
+        }
+        else if (e.Key == "Enter")
+        {
+            if (_results.Count > 0 && _activeIndex >= 0 && _activeIndex < _results.Count)
+            {
+                ExecuteResult(_results[_activeIndex]);
+            }
+        }
+        else if (e.Key == "Escape")
+        {
+            Close();
+        }
+    }
+
+    private void ExecuteResult(CommandItem item)
+    {
+        item.Action.Invoke();
+    }
+
+    private void Close()
+    {
+        AppState.ToggleCommandBar(false);
+    }
+
+    public void Dispose()
+    {
+        AppState.OnChange -= HandleStateChanged;
+    }
+}

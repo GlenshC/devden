@@ -1,0 +1,85 @@
+@inject ToastService ToastService
+@implements IDisposable
+
+<div class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none max-w-sm w-full">
+    @foreach (var toast in _activeToasts)
+    {
+        <div class="pointer-events-auto flex items-center justify-between gap-3 px-4 py-3 rounded-lg shadow-xl backdrop-blur-md border text-sm animate-in slide-in-from-bottom-2 duration-200 @GetToastClasses(toast.Type)"
+             role="alert">
+            <div class="flex items-center gap-2.5 overflow-hidden">
+                <span class="text-base flex-shrink-0">@GetToastIcon(toast.Type)</span>
+                <span class="truncate text-fg font-medium">@toast.Message</span>
+            </div>
+
+            <div class="flex items-center gap-2 flex-shrink-0">
+                @if (!string.IsNullOrEmpty(toast.ActionLabel) && toast.OnAction != null)
+                {
+                    <button type="button"
+                            class="text-xs font-semibold px-2 py-1 rounded bg-white/20 hover:bg-white/30 text-white transition"
+                            @onclick="() => HandleAction(toast)">
+                        @toast.ActionLabel
+                    </button>
+                }
+                <button type="button"
+                        class="text-muted hover:text-fg text-xs p-1"
+                        @onclick="() => RemoveToast(toast.Id)">
+                    ✕
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private readonly List<ToastMessage> _activeToasts = new();
+
+    protected override void OnInitialized()
+    {
+        ToastService.OnShowToast += HandleShowToast;
+    }
+
+    private void HandleShowToast(ToastMessage toast)
+    {
+        _activeToasts.Add(toast);
+        InvokeAsync(StateHasChanged);
+
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(toast.DurationMs);
+            RemoveToast(toast.Id);
+        });
+    }
+
+    private void RemoveToast(Guid id)
+    {
+        _activeToasts.RemoveAll(t => t.Id == id);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleAction(ToastMessage toast)
+    {
+        toast.OnAction?.Invoke();
+        RemoveToast(toast.Id);
+    }
+
+    private static string GetToastClasses(ToastType type) => type switch
+    {
+        ToastType.Success => "bg-[#0e0f12]/90 border-coral/40 text-fg",
+        ToastType.Error => "bg-[#1a0809]/90 border-crimson/60 text-crimson",
+        ToastType.Warning => "bg-[#1a1208]/90 border-amber/50 text-amber",
+        _ => "bg-[#0e0f12]/90 border-hairline text-fg"
+    };
+
+    private static string GetToastIcon(ToastType type) => type switch
+    {
+        ToastType.Success => "✓",
+        ToastType.Error => "✕",
+        ToastType.Warning => "⚠",
+        _ => "ℹ"
+    };
+
+    public void Dispose()
+    {
+        ToastService.OnShowToast -= HandleShowToast;
+    }
+}

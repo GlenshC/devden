@@ -1,0 +1,23 @@
+<div class="w-full @Class">
+    @if (ShowLabel)
+    {
+        <div class="flex items-center justify-between text-xs text-muted mb-1 font-mono">
+            <span>@Label</span>
+            <span>@Percentage%</span>
+        </div>
+    }
+    <div class="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+        <div class="h-full bg-gradient-to-r from-amber via-coral to-crimson transition-all duration-300 rounded-full"
+             style="width: @(Math.Clamp(Value * 100, 0, 100))%">
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public double Value { get; set; } // 0.0 to 1.0
+    [Parameter] public bool ShowLabel { get; set; } = true;
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public string Class { get; set; } = "";
+
+    private int Percentage => (int)Math.Round(Math.Clamp(Value * 100, 0, 100));
+}

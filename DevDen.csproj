@@ -10,6 +10,12 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.13" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.13" PrivateAssets="all" />
+    <PackageReference Include="Markdig" Version="0.40.0" />
   </ItemGroup>
+
+  <!-- Optional Tailwind CSS compile on Build if npx/tailwindcss is available -->
+  <Target Name="BuildTailwind" BeforeTargets="BeforeBuild" Condition="'$(Configuration)' == 'Release' or Exists('node_modules')">
+    <Exec Command="npx tailwindcss -i ./wwwroot/css/tailwind.input.css -o ./wwwroot/css/app.css --minify" ContinueOnError="true" />
+  </Target>
 
 </Project>

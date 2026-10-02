@@ -1,0 +1,162 @@
+@inject AppState AppState
+@inject ItemService ItemService
+@inject IJSRuntime JS
+
+<div class="flex flex-col flex-shrink-0 w-80 glass-panel-subtle rounded-panel border border-hairline p-3 max-h-[calc(100vh-140px)] min-h-[400px] transition-colors @(_isDragOver ? "border-coral/40 bg-coral/[0.03]" : "")"
+     @ondragover="HandleDragOver"
+     @ondragover:preventDefault="true"
+     @ondragleave="HandleDragLeave"
+     @ondrop="HandleDrop">
+
+    <!-- Column Header -->
+    <div class="flex items-center justify-between pb-3 mb-2 border-b border-white/5">
+        <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full @GetCategoryDotClass(Status.Category)"></span>
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-fg font-mono">
+                @Status.Name
+            </h3>
+            <span class="text-xs font-mono text-muted/60 bg-white/5 px-1.5 py-0.2 rounded-full">
+                @Items.Count
+            </span>
+        </div>
+
+        <button type="button"
+                class="w-6 h-6 rounded flex items-center justify-center text-muted hover:text-fg hover:bg-white/10 transition text-sm"
+                title="Quick Add Item"
+                @onclick="StartInlineCreate">
+            ＋
+        </button>
+    </div>
+
+    <!-- Inline Quick Add Input -->
+    @if (_isInlineCreating)
+    {
+        <div class="mb-3 p-2.5 rounded-lg bg-white/5 border border-coral/30 shadow-lg animate-in fade-in duration-100">
+            <input id="@($"inline-input-{Status.Id}")"
+                   type="text"
+                   class="w-full bg-transparent text-sm text-fg placeholder:text-muted/50 focus:outline-none mb-2"
+                   placeholder="Item title... (Press Enter)"
+                   @bind="_inlineTitle"
+                   @bind:event="oninput"
+                   @onkeydown="HandleInlineKeyDown" />
+            <div class="flex items-center justify-between text-[11px] text-muted">
+                <span>Enter to save · Esc to cancel</span>
+                <button type="button" class="text-coral hover:underline font-medium" @onclick="SubmitInlineCreate">
+                    Add
+                </button>
+            </div>
+        </div>
+    }
+
+    <!-- Cards Scroll Area -->
+    <div class="flex-1 overflow-y-auto pr-1 space-y-1">
+        @if (Items.Count == 0 && !_isInlineCreating)
+        {
+            <div class="h-32 border border-dashed border-white/5 rounded-lg flex items-center justify-center text-xs text-muted/40">
+                Drop items here
+            </div>
+        }
+        else
+        {
+            @foreach (var item in Items.OrderBy(i => i.Order))
+            {
+                <div @ondragover="() => _hoveredItemId = item.Id"
+                     @ondragover:preventDefault="true">
+                    <ItemCard Item="@item"
+                              IsDone="@(Status.Category == StatusCategory.Done)"
+                              OnDragStart="() => HandleItemDragStart(item)" />
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public Status Status { get; set; } = default!;
+    [Parameter] public IReadOnlyList<Item> Items { get; set; } = Array.Empty<Item>();
+    [Parameter] public EventCallback<(Guid ItemId, Guid TargetStatusId, Guid? BeforeItemId)> OnItemDropped { get; set; }
+    [Parameter] public EventCallback<Item> OnDraggingStarted { get; set; }
+
+    private bool _isDragOver;
+    private bool _isInlineCreating;
+    private string _inlineTitle = "";
+    private Guid? _hoveredItemId;
+
+    private void HandleDragOver(DragEventArgs e)
+    {
+        _isDragOver = true;
+    }
+
+    private void HandleDragLeave(DragEventArgs e)
+    {
+        _isDragOver = false;
+        _hoveredItemId = null;
+    }
+
+    private async Task HandleDrop(DragEventArgs e)
+    {
+        _isDragOver = false;
+        if (OnItemDropped.HasDelegate)
+        {
+            // Drop onto this column
+            await OnItemDropped.InvokeAsync((Guid.Empty, Status.Id, _hoveredItemId));
+        }
+        _hoveredItemId = null;
+    }
+
+    private void HandleItemDragStart(Item item)
+    {
+        OnDraggingStarted.InvokeAsync(item);
+    }
+
+    private void StartInlineCreate()
+    {
+        _isInlineCreating = true;
+        _inlineTitle = "";
+        StateHasChanged();
+        _ = JS.InvokeVoidAsync("denUtils.focusElement", $"inline-input-{Status.Id}");
+    }
+
+    private void HandleInlineKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            SubmitInlineCreate();
+        }
+        else if (e.Key == "Escape")
+        {
+            _isInlineCreating = false;
+        }
+    }
+
+    private void SubmitInlineCreate()
+    {
+        if (!string.IsNullOrWhiteSpace(_inlineTitle) && AppState.ActiveProjectId.HasValue)
+        {
+            var draft = new ItemDraft(
+                Title: _inlineTitle,
+                Body: null,
+                StatusId: Status.Id,
+                Type: ItemType.Task,
+                Priority: Priority.P2
+            );
+
+            ItemService.CreateItem(AppState.ActiveProjectId.Value, draft);
+            _inlineTitle = "";
+            // keep open for rapid entry
+            _ = JS.InvokeVoidAsync("denUtils.focusElement", $"inline-input-{Status.Id}");
+        }
+        else
+        {
+            _isInlineCreating = false;
+        }
+    }
+
+    private static string GetCategoryDotClass(StatusCategory cat) => cat switch
+    {
+        StatusCategory.Backlog => "bg-muted",
+        StatusCategory.Active => "bg-amber",
+        StatusCategory.Done => "bg-coral",
+        _ => "bg-muted"
+    };
+}

@@ -1,0 +1,472 @@
+@page "/settings"
+@inject AppState AppState
+@inject ProjectService ProjectService
+@inject ItemService ItemService
+@inject IDataStore DataStore
+@inject ToastService Toast
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>Settings — DevDen</PageTitle>
+
+<div class="max-w-4xl mx-auto space-y-6">
+    <!-- Settings Header -->
+    <div class="pb-3 border-b border-white/5">
+        <h1 class="text-2xl font-bold text-fg">Settings</h1>
+        <p class="text-xs text-muted mt-1">Manage projects, statuses, labels, and backup your data</p>
+    </div>
+
+    @if (_activeSection == "project" && _editingProject != null)
+    {
+        <!-- Project Detail Editor -->
+        <div class="glass-panel rounded-panel border border-hairline overflow-hidden">
+            <div class="px-5 py-4 bg-white/[0.02] border-b border-white/5 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <button type="button" class="text-muted hover:text-fg text-sm" @onclick="@(() => _activeSection = string.Empty)">← Back</button>
+                    <h2 class="text-base font-semibold text-fg">@_editingProject.Name</h2>
+                    <span class="font-mono text-xs text-muted bg-white/5 px-2 py-0.5 rounded">@_editingProject.Key</span>
+                </div>
+
+                <button type="button"
+                        class="text-xs text-crimson hover:text-crimson/80 font-medium"
+                        @onclick="() => DeleteProject(_editingProject.Id)">
+                    Delete Project
+                </button>
+            </div>
+
+            <div class="p-5 space-y-6">
+                <!-- Project Info -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-mono text-muted uppercase tracking-wider mb-1.5">Name</label>
+                        <input type="text"
+                               class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-fg focus:outline-none focus:border-coral/50"
+                               @bind="_editingProjectName"
+                               @bind:event="oninput" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-mono text-muted uppercase tracking-wider mb-1.5">Description</label>
+                        <input type="text"
+                               class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-fg focus:outline-none focus:border-coral/50"
+                               @bind="_editingProjectDesc"
+                               @bind:event="oninput" />
+                    </div>
+                </div>
+
+                <div class="flex justify-end">
+                    <KeycapButton Text="Save Changes" Size="sm" OnClick="SaveProjectChanges" />
+                </div>
+
+                <!-- Statuses Management -->
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-semibold text-fg">Statuses (@_editingProject.Statuses.Count)</h3>
+                        <button type="button"
+                                class="text-xs text-coral hover:text-coral/80 font-medium"
+                                @onclick="OpenAddStatusModal">
+                            + Add Status
+                        </button>
+                    </div>
+
+                    <div class="space-y-2">
+                        @foreach (var status in _editingProject.Statuses.OrderBy(s => s.Order))
+                        {
+                            <div class="flex items-center justify-between px-3 py-2 bg-white/[0.02] rounded-lg border border-white/5 text-xs">
+                                <div class="flex items-center gap-3">
+                                    <span class="w-2 h-2 rounded-full @GetCategoryDotClass(status.Category)"></span>
+                                    <span class="text-fg font-medium">@status.Name</span>
+                                    <span class="text-muted/60 font-mono text-[10px] uppercase">@status.Category</span>
+                                </div>
+                                <button type="button"
+                                        class="text-muted hover:text-crimson text-xs"
+                                        @onclick="() => DeleteStatus(status.Id)">
+                                    ✕
+                                </button>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Labels Management -->
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-semibold text-fg">Labels (@_editingProject.Labels.Count)</h3>
+                        <button type="button"
+                                class="text-xs text-coral hover:text-coral/80 font-medium"
+                                @onclick="OpenAddLabelModal">
+                            + Add Label
+                        </button>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2">
+                        @foreach (var label in _editingProject.Labels)
+                        {
+                            <div class="flex items-center gap-1.5 px-2.5 py-1 rounded border text-xs @LabelColors.GetClass(label.ColorToken)">
+                                <span>@label.Name</span>
+                                <button type="button"
+                                        class="hover:brightness-125 text-[10px]"
+                                        @onclick="() => DeleteLabel(label.Id)">
+                                    ✕
+                                </button>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Projects List -->
+        <div class="glass-panel rounded-panel border border-hairline overflow-hidden">
+            <div class="px-5 py-4 bg-white/[0.02] border-b border-white/5 flex items-center justify-between">
+                <h2 class="text-base font-semibold text-fg">Projects</h2>
+                <KeycapButton Text="New Project" Size="sm" OnClick="OpenNewProjectModal" />
+            </div>
+
+            <div class="divide-y divide-white/5">
+                @foreach (var proj in AppState.Projects)
+                {
+                    <div class="px-5 py-3 flex items-center justify-between hover:bg-white/[0.02] transition cursor-pointer group"
+                         @onclick="() => OpenProjectEditor(proj)">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-amber via-coral to-crimson flex items-center justify-center font-mono font-bold text-xs text-black">
+                                @proj.Key.Substring(0, Math.Min(2, proj.Key.Length))
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-medium text-fg group-hover:text-white transition">@proj.Name</h3>
+                                <span class="font-mono text-xs text-muted">@proj.Key · @proj.Statuses.Count statuses · @proj.Labels.Count labels</span>
+                            </div>
+                        </div>
+                        <span class="text-muted group-hover:text-fg text-xs">→</span>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Data Export / Import -->
+        <div class="glass-panel rounded-panel border border-hairline overflow-hidden">
+            <div class="px-5 py-4 bg-white/[0.02] border-b border-white/5">
+                <h2 class="text-base font-semibold text-fg">Data Backup</h2>
+            </div>
+
+            <div class="p-5 space-y-4">
+                <p class="text-xs text-muted leading-relaxed">
+                    Export all your projects, items, and settings as a JSON file. You can import this backup later to restore your data.
+                </p>
+
+                <div class="flex flex-wrap gap-3">
+                    <KeycapButton Text="Export JSON" OnClick="ExportData" />
+                    <label class="keycap cursor-pointer">
+                        Import JSON
+                        <input type="file"
+                               accept=".json"
+                               class="hidden"
+                               @onchange="ImportData" />
+                    </label>
+                </div>
+
+                <div class="pt-3 border-t border-white/5">
+                    <p class="text-[11px] text-muted/60">
+                        Data is stored locally in your browser's localStorage. Clearing browser data will remove all DevDen data.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Keyboard Shortcuts Reference -->
+        <div class="glass-panel rounded-panel border border-hairline overflow-hidden">
+            <div class="px-5 py-4 bg-white/[0.02] border-b border-white/5">
+                <h2 class="text-base font-semibold text-fg">Keyboard Shortcuts</h2>
+            </div>
+
+            <div class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 text-xs">
+                <div class="flex items-center justify-between py-1.5 border-b border-white/5">
+                    <span class="text-muted">Command Bar</span>
+                    <span class="kbd-chip">⌘K</span>
+                </div>
+                <div class="flex items-center justify-between py-1.5 border-b border-white/5">
+                    <span class="text-muted">New Item</span>
+                    <span class="kbd-chip">C</span>
+                </div>
+                <div class="flex items-center justify-between py-1.5 border-b border-white/5">
+                    <span class="text-muted">Search / Filter</span>
+                    <span class="kbd-chip">/</span>
+                </div>
+                <div class="flex items-center justify-between py-1.5 border-b border-white/5">
+                    <span class="text-muted">Navigate Items</span>
+                    <span class="kbd-chip">J / K</span>
+                </div>
+                <div class="flex items-center justify-between py-1.5 border-b border-white/5">
+                    <span class="text-muted">Toggle Today</span>
+                    <span class="kbd-chip">T</span>
+                </div>
+                <div class="flex items-center justify-between py-1.5 border-b border-white/5">
+                    <span class="text-muted">Cycle Views</span>
+                    <span class="kbd-chip">[ / ]</span>
+                </div>
+                <div class="flex items-center justify-between py-1.5 border-b border-white/5">
+                    <span class="text-muted">Close Panel</span>
+                    <span class="kbd-chip">ESC</span>
+                </div>
+                <div class="flex items-center justify-between py-1.5 border-b border-white/5">
+                    <span class="text-muted">Submit Form</span>
+                    <span class="kbd-chip">⌘Enter</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- About -->
+        <div class="text-center py-8 text-xs text-muted/60 space-y-1">
+            <p class="font-mono">DevDen v0.1 · Blazor WASM · Tailwind CSS</p>
+            <p>Built with warmth · No backend required</p>
+        </div>
+    }
+</div>
+
+<!-- Add Status Modal -->
+@if (_isAddStatusOpen)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+        <div class="glass-panel w-full max-w-sm p-5 shadow-2xl border border-hairline rounded-panel">
+            <h3 class="text-base font-semibold text-fg mb-4">Add Status</h3>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-mono text-muted uppercase mb-1">Name</label>
+                    <input type="text" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-fg" @bind="_newStatusName" />
+                </div>
+                <div>
+                    <label class="block text-xs font-mono text-muted uppercase mb-1">Category</label>
+                    <select class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-fg" @bind="_newStatusCategory">
+                        @foreach (var cat in Enum.GetValues<StatusCategory>())
+                        {
+                            <option value="@cat">@cat</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 mt-4">
+                <button type="button" class="text-xs text-muted hover:text-fg px-2 py-1" @onclick="() => _isAddStatusOpen = false">Cancel</button>
+                <KeycapButton Text="Add" Size="sm" OnClick="AddStatus" />
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Add Label Modal -->
+@if (_isAddLabelOpen)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+        <div class="glass-panel w-full max-w-sm p-5 shadow-2xl border border-hairline rounded-panel">
+            <h3 class="text-base font-semibold text-fg mb-4">Add Label</h3>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-mono text-muted uppercase mb-1">Name</label>
+                    <input type="text" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-fg" @bind="_newLabelName" />
+                </div>
+                <div>
+                    <label class="block text-xs font-mono text-muted uppercase mb-1">Color</label>
+                    <div class="flex flex-wrap gap-2">
+                        @foreach (var color in LabelColors.WarmTokens)
+                        {
+                            <button type="button"
+                                    class="px-2.5 py-1 rounded border text-xs @color.BadgeClass @(_newLabelColor == color.Token ? "ring-2 ring-white/50" : "")"
+                                    @onclick="() => _newLabelColor = color.Token">
+                                @color.Name
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 mt-4">
+                <button type="button" class="text-xs text-muted hover:text-fg px-2 py-1" @onclick="() => _isAddLabelOpen = false">Cancel</button>
+                <KeycapButton Text="Add" Size="sm" OnClick="AddLabel" />
+            </div>
+        </div>
+    </div>
+}
+
+<!-- New Project Modal -->
+@if (_isNewProjectOpen)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+        <div class="glass-panel w-full max-w-md p-5 shadow-2xl border border-hairline rounded-panel">
+            <h3 class="text-base font-semibold text-fg mb-4">Create New Project</h3>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-mono text-muted uppercase mb-1">Project Name</label>
+                    <input type="text" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-fg" @bind="_newProjectName" />
+                </div>
+                <div>
+                    <label class="block text-xs font-mono text-muted uppercase mb-1">Key (2-5 uppercase)</label>
+                    <input type="text" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-fg font-mono uppercase" maxlength="5" @bind="_newProjectKey" />
+                </div>
+            </div>
+            @if (!string.IsNullOrEmpty(_newProjectError))
+            {
+                <p class="text-xs text-crimson mt-2">@_newProjectError</p>
+            }
+            <div class="flex justify-end gap-2 mt-4">
+                <button type="button" class="text-xs text-muted hover:text-fg px-2 py-1" @onclick="() => _isNewProjectOpen = false">Cancel</button>
+                <KeycapButton Text="Create" Size="sm" OnClick="CreateNewProject" />
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private string _activeSection = "";
+    private Project? _editingProject;
+    private string _editingProjectName = "";
+    private string? _editingProjectDesc;
+
+    private bool _isAddStatusOpen;
+    private string _newStatusName = "";
+    private StatusCategory _newStatusCategory = StatusCategory.Active;
+
+    private bool _isAddLabelOpen;
+    private string _newLabelName = "";
+    private string _newLabelColor = "coral";
+
+    private bool _isNewProjectOpen;
+    private string _newProjectName = "";
+    private string _newProjectKey = "";
+    private string _newProjectError = "";
+
+    protected override void OnInitialized()
+    {
+        AppState.OnChange += StateHasChanged;
+    }
+
+    private void OpenProjectEditor(Project proj)
+    {
+        _editingProject = proj;
+        _editingProjectName = proj.Name;
+        _editingProjectDesc = proj.Description;
+        _activeSection = "project";
+    }
+
+    private void SaveProjectChanges()
+    {
+        if (_editingProject == null) return;
+        ProjectService.UpdateProject(_editingProject.Id, _editingProjectName, _editingProjectDesc);
+        Toast.ShowSuccess("Project updated");
+    }
+
+    private void DeleteProject(Guid id)
+    {
+        var result = ProjectService.DeleteProject(id);
+        if (result.IsSuccess)
+        {
+            _activeSection = "";
+            _editingProject = null;
+        }
+    }
+
+    private void OpenAddStatusModal()
+    {
+        _newStatusName = "";
+        _newStatusCategory = StatusCategory.Active;
+        _isAddStatusOpen = true;
+    }
+
+    private void AddStatus()
+    {
+        if (_editingProject == null || string.IsNullOrWhiteSpace(_newStatusName)) return;
+        var result = ProjectService.AddStatus(_editingProject.Id, _newStatusName, _newStatusCategory);
+        if (result.IsSuccess)
+        {
+            _isAddStatusOpen = false;
+            _editingProject = AppState.Projects.First(p => p.Id == _editingProject.Id);
+        }
+    }
+
+    private void DeleteStatus(Guid statusId)
+    {
+        if (_editingProject == null || _editingProject.Statuses.Count <= 1) return;
+        var migrateTo = _editingProject.Statuses.First(s => s.Id != statusId).Id;
+        ProjectService.DeleteStatus(_editingProject.Id, statusId, migrateTo);
+        _editingProject = AppState.Projects.First(p => p.Id == _editingProject.Id);
+    }
+
+    private void OpenAddLabelModal()
+    {
+        _newLabelName = "";
+        _newLabelColor = "coral";
+        _isAddLabelOpen = true;
+    }
+
+    private void AddLabel()
+    {
+        if (_editingProject == null || string.IsNullOrWhiteSpace(_newLabelName)) return;
+        var result = ProjectService.AddLabel(_editingProject.Id, _newLabelName, _newLabelColor);
+        if (result.IsSuccess)
+        {
+            _isAddLabelOpen = false;
+            _editingProject = AppState.Projects.First(p => p.Id == _editingProject.Id);
+        }
+    }
+
+    private void DeleteLabel(Guid labelId)
+    {
+        if (_editingProject == null) return;
+        ProjectService.DeleteLabel(_editingProject.Id, labelId);
+        _editingProject = AppState.Projects.First(p => p.Id == _editingProject.Id);
+    }
+
+    private void OpenNewProjectModal()
+    {
+        _newProjectName = "";
+        _newProjectKey = "";
+        _newProjectError = "";
+        _isNewProjectOpen = true;
+    }
+
+    private void CreateNewProject()
+    {
+        _newProjectError = "";
+        var result = ProjectService.CreateProject(_newProjectName, _newProjectKey);
+        if (result.IsSuccess)
+        {
+            _isNewProjectOpen = false;
+        }
+        else
+        {
+            _newProjectError = result.ErrorMessage ?? "Failed to create project";
+        }
+    }
+
+    private async Task ExportData()
+    {
+        try
+        {
+            var json = await DataStore.ExportAsync();
+            await JS.InvokeVoidAsync("denUtils.downloadJson", $"devden-backup-{DateTime.UtcNow:yyyyMMdd-HHmmss}.json", json);
+            Toast.ShowSuccess("Backup exported successfully");
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Export failed: {ex.Message}");
+        }
+    }
+
+    private async Task ImportData(ChangeEventArgs e)
+    {
+        // Note: In a real implementation, you'd use a file reader
+        // This is simplified for the demo
+        Toast.ShowInfo("Import feature: select a JSON backup file to restore your data.");
+    }
+
+    private static string GetCategoryDotClass(StatusCategory cat) => cat switch
+    {
+        StatusCategory.Backlog => "bg-muted",
+        StatusCategory.Active => "bg-amber",
+        StatusCategory.Done => "bg-coral",
+        _ => "bg-muted"
+    };
+
+    public void Dispose()
+    {
+        AppState.OnChange -= StateHasChanged;
+    }
+}

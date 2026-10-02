@@ -1,0 +1,274 @@
+@page "/today"
+@inject AppState AppState
+@inject ItemService ItemService
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>Today — DevDen</PageTitle>
+
+<div class="max-w-4xl mx-auto space-y-6">
+    <!-- Today Header -->
+    <div class="flex items-center justify-between pb-3 border-b border-white/5">
+        <div>
+            <h1 class="text-2xl font-bold text-fg flex items-center gap-2.5">
+                <span>⚡</span>
+                <span>Today</span>
+                <span class="text-xs font-mono text-muted bg-white/5 px-2 py-0.5 rounded border border-white/5">
+                    @DateTime.Today.ToString("MMM dd, yyyy")
+                </span>
+            </h1>
+            <p class="text-xs text-muted mt-1">
+                Your cross-project focus list · @AppState.AllTodayItems.Count items pinned
+            </p>
+        </div>
+    </div>
+
+    <!-- Quick Add Input with #KEY parsing -->
+    <div class="glass-panel p-4 rounded-panel border border-hairline">
+        <div class="flex items-center gap-3">
+            <span class="text-coral text-lg flex-shrink-0">＋</span>
+            <input id="today-quick-add"
+                   type="text"
+                   class="flex-1 bg-transparent text-sm text-fg placeholder:text-muted/50 focus:outline-none"
+                   placeholder="Quick add (e.g. 'Fix sidebar overflow' or '#DEN implement feature')..."
+                   @bind="_quickAddText"
+                   @bind:event="oninput"
+                   @onkeydown="HandleQuickAddKeyDown" />
+            <span class="text-[10px] font-mono text-muted/60">Enter to add</span>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_quickAddError))
+        {
+            <p class="text-xs text-crimson mt-2">@_quickAddError</p>
+        }
+    </div>
+
+    <!-- Overdue / Due Today Section (Auto-calculated) -->
+    @{
+        var overdueItems = AppState.ItemsByProject.Values
+            .SelectMany(list => list)
+            .Where(i => i.DueDate.HasValue &&
+                        i.DueDate.Value <= DateOnly.FromDateTime(DateTime.Today) &&
+                        AppState.Projects.FirstOrDefault(p => p.Id == i.ProjectId) is { } proj &&
+                        proj.Statuses.FirstOrDefault(s => s.Id == i.StatusId)?.Category != StatusCategory.Done)
+            .OrderBy(i => i.DueDate)
+            .ToList();
+    }
+
+    @if (overdueItems.Count > 0)
+    {
+        <div class="glass-panel rounded-panel border border-crimson/30 overflow-hidden bg-crimson/[0.02]">
+            <div class="px-4 py-3 bg-crimson/10 border-b border-crimson/20 flex items-center gap-2">
+                <span class="text-crimson text-sm">🔥</span>
+                <h2 class="text-sm font-semibold text-crimson">Overdue & Due Today (@overdueItems.Count)</h2>
+            </div>
+
+            <div class="divide-y divide-white/5">
+                @foreach (var item in overdueItems)
+                {
+                    var proj = AppState.Projects.FirstOrDefault(p => p.Id == item.ProjectId);
+                    var isOverdue = item.DueDate.HasValue && item.DueDate.Value < DateOnly.FromDateTime(DateTime.Today);
+
+                    <div class="px-4 py-2.5 flex items-center justify-between hover:bg-white/[0.02] transition cursor-pointer group text-xs"
+                         @onclick="() => AppState.SetSelectedItem(item)">
+                        <div class="flex items-center gap-3 overflow-hidden">
+                            <span class="font-mono text-muted group-hover:text-coral transition-colors flex-shrink-0">
+                                @(proj?.Key ?? "?")-@item.Number
+                            </span>
+                            <Chip Type="@item.Type" Class="text-[10px] py-0 px-1" />
+                            <span class="font-medium text-fg truncate">@item.Title</span>
+                        </div>
+
+                        <div class="flex items-center gap-3 flex-shrink-0">
+                            <Chip Priority="@item.Priority" Class="text-[10px] py-0 px-1.5" />
+                            <span class="font-mono text-xs @(isOverdue ? "text-crimson font-bold" : "text-amber")">
+                                @(item.DueDate?.ToString("MMM dd") ?? "")
+                            </span>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- Pinned Today Items (InToday = true) -->
+    <div class="glass-panel rounded-panel border border-hairline overflow-hidden">
+        <div class="px-4 py-3 bg-white/[0.02] border-b border-white/5 flex items-center gap-2">
+            <h2 class="text-sm font-semibold text-fg">Today's Focus Items</h2>
+            <span class="text-xs font-mono text-muted/60 bg-white/5 px-1.5 py-0.5 rounded-full">
+                @AppState.AllTodayItems.Count
+            </span>
+        </div>
+
+        <div class="divide-y divide-white/5">
+            @if (AppState.AllTodayItems.Count == 0)
+            {
+                <div class="p-8 text-center text-xs text-muted/50 italic space-y-2">
+                    <p>No items pinned to Today yet.</p>
+                    <p class="text-[11px]">Press <span class="kbd-chip text-[9px]">T</span> on any item to pin it here.</p>
+                </div>
+            }
+            else
+            {
+                @foreach (var item in AppState.AllTodayItems.OrderBy(i => i.Priority))
+                {
+                    var proj = AppState.Projects.FirstOrDefault(p => p.Id == item.ProjectId);
+                    var status = proj?.Statuses.FirstOrDefault(s => s.Id == item.StatusId);
+                    var isDone = status?.Category == StatusCategory.Done;
+
+                    <div class="px-4 py-2.5 flex items-center justify-between hover:bg-white/[0.02] transition cursor-pointer group text-xs @(isDone ? "opacity-60" : "")"
+                         @onclick="() => AppState.SetSelectedItem(item)">
+                        <div class="flex items-center gap-3 overflow-hidden">
+                            <!-- Checkbox to mark done -->
+                            <input type="checkbox"
+                                   checked="@isDone"
+                                   class="rounded bg-white/5 border-white/20 text-coral focus:ring-0 flex-shrink-0"
+                                   @onchange="() => ToggleDone(item)"
+                                   @onclick:stopPropagation="true" />
+
+                            <span class="font-mono text-muted group-hover:text-coral transition-colors flex-shrink-0">
+                                @(proj?.Key ?? "?")-@item.Number
+                            </span>
+                            <Chip Type="@item.Type" Class="text-[10px] py-0 px-1" />
+                            <span class="font-medium text-fg truncate @(isDone ? "line-through text-muted" : "")">
+                                @item.Title
+                            </span>
+                        </div>
+
+                        <div class="flex items-center gap-3 flex-shrink-0">
+                            <Chip Priority="@item.Priority" Class="text-[10px] py-0 px-1.5" />
+                            <span class="text-muted font-mono text-[11px]">
+                                @(status?.Name ?? "")
+                            </span>
+                            <button type="button"
+                                    class="opacity-0 group-hover:opacity-100 text-muted hover:text-crimson text-xs p-0.5 transition"
+                                    title="Unpin from Today"
+                                    @onclick="() => ItemService.ToggleToday(item.Id)"
+                                    @onclick:stopPropagation="true">
+                                ✕
+                            </button>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private string _quickAddText = "";
+    private string _quickAddError = "";
+
+    protected override void OnInitialized()
+    {
+        AppState.OnChange += StateHasChanged;
+    }
+
+    private void HandleQuickAddKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_quickAddText))
+        {
+            _quickAddError = "";
+            var text = _quickAddText.Trim();
+
+            // Parse #KEY prefix to override project
+            Guid? targetProjectId = AppState.ActiveProjectId;
+            string title = text;
+
+            if (text.StartsWith("#"))
+            {
+                var spaceIdx = text.IndexOf(' ');
+                if (spaceIdx > 0)
+                {
+                    var keyPart = text[1..spaceIdx].Trim().ToUpperInvariant();
+                    var foundProj = AppState.Projects.FirstOrDefault(p => p.Key.Equals(keyPart, StringComparison.OrdinalIgnoreCase));
+
+                    if (foundProj != null)
+                    {
+                        targetProjectId = foundProj.Id;
+                        title = text[(spaceIdx + 1)..].Trim();
+                    }
+                    else
+                    {
+                        _quickAddError = $"Project key '{keyPart}' not found.";
+                        return;
+                    }
+                }
+            }
+
+            // If no project active and no prefix, use first project
+            if (!targetProjectId.HasValue && AppState.Projects.Count > 0)
+            {
+                targetProjectId = AppState.Projects[0].Id;
+            }
+
+            if (!targetProjectId.HasValue)
+            {
+                _quickAddError = "No project available. Create one first.";
+                return;
+            }
+
+            var project = AppState.Projects.First(p => p.Id == targetProjectId.Value);
+            var defaultStatus = project.Statuses.FirstOrDefault(s => s.Category == StatusCategory.Active)
+                ?? project.Statuses.FirstOrDefault();
+
+            if (defaultStatus == null)
+            {
+                _quickAddError = "Project has no statuses.";
+                return;
+            }
+
+            var draft = new ItemDraft(
+                Title: title,
+                Body: null,
+                StatusId: defaultStatus.Id,
+                Type: ItemType.Task,
+                Priority: Priority.P2,
+                InToday: true
+            );
+
+            var result = ItemService.CreateItem(targetProjectId.Value, draft);
+            if (result.IsSuccess)
+            {
+                _quickAddText = "";
+            }
+            else
+            {
+                _quickAddError = result.ErrorMessage ?? "Failed to create item.";
+            }
+        }
+    }
+
+    private void ToggleDone(Item item)
+    {
+        var proj = AppState.Projects.FirstOrDefault(p => p.Id == item.ProjectId);
+        if (proj == null) return;
+
+        var currentStatus = proj.Statuses.FirstOrDefault(s => s.Id == item.StatusId);
+        if (currentStatus == null) return;
+
+        if (currentStatus.Category == StatusCategory.Done)
+        {
+            // Move back to active
+            var activeStatus = proj.Statuses.FirstOrDefault(s => s.Category == StatusCategory.Active);
+            if (activeStatus != null)
+            {
+                ItemService.MoveItem(item.Id, activeStatus.Id);
+            }
+        }
+        else
+        {
+            // Move to first Done status
+            var doneStatus = proj.Statuses.FirstOrDefault(s => s.Category == StatusCategory.Done);
+            if (doneStatus != null)
+            {
+                ItemService.MoveItem(item.Id, doneStatus.Id);
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        AppState.OnChange -= StateHasChanged;
+    }
+}

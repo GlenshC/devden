@@ -1,0 +1,104 @@
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium border transition-colors @GetBadgeClass() @Class @(OnClick.HasDelegate ? "cursor-pointer hover:brightness-110" : "")"
+      @onclick="HandleClick">
+    @if (Priority.HasValue)
+    {
+        <span class="w-1.5 h-1.5 rounded-full @GetPriorityDotClass(Priority.Value)"></span>
+        <span>@Priority.Value</span>
+    }
+    else if (Type.HasValue)
+    {
+        <span class="font-mono text-[10px] opacity-75">@GetTypeGlyph(Type.Value)</span>
+        <span>@Type.Value</span>
+    }
+    else if (Label != null)
+    {
+        <span>@Label.Name</span>
+    }
+    else if (!string.IsNullOrEmpty(Text))
+    {
+        <span>@Text</span>
+    }
+
+    @if (OnRemove.HasDelegate)
+    {
+        <button type="button" class="hover:text-fg opacity-60 hover:opacity-100 ml-0.5" @onclick="HandleRemove" @onclick:stopPropagation="true">
+            ✕
+        </button>
+    }
+</span>
+
+@code {
+    [Parameter] public Priority? Priority { get; set; }
+    [Parameter] public ItemType? Type { get; set; }
+    [Parameter] public Label? Label { get; set; }
+    [Parameter] public string? Text { get; set; }
+    [Parameter] public string? ColorToken { get; set; }
+    [Parameter] public string Class { get; set; } = "";
+    [Parameter] public EventCallback OnClick { get; set; }
+    [Parameter] public EventCallback OnRemove { get; set; }
+
+    private string GetBadgeClass()
+    {
+        if (Priority.HasValue)
+        {
+            return Priority.Value switch
+            {
+                Models.Priority.P0 => "bg-crimson/15 text-crimson border-crimson/30",
+                Models.Priority.P1 => "bg-coral/15 text-coral border-coral/30",
+                Models.Priority.P2 => "bg-amber/15 text-amber border-amber/30",
+                _ => "bg-muted/15 text-muted border-muted/30"
+            };
+        }
+
+        if (Type.HasValue)
+        {
+            return Type.Value switch
+            {
+                ItemType.Bug => "bg-crimson/10 text-crimson border-crimson/20",
+                ItemType.Feature => "bg-coral/10 text-coral border-coral/20",
+                ItemType.Task => "bg-amber/10 text-amber border-amber/20",
+                ItemType.Chore => "bg-muted/10 text-muted border-muted/20",
+                _ => "bg-muted/10 text-muted border-muted/20"
+            };
+        }
+
+        if (Label != null)
+        {
+            return LabelColors.GetClass(Label.ColorToken);
+        }
+
+        if (!string.IsNullOrEmpty(ColorToken))
+        {
+            return LabelColors.GetClass(ColorToken);
+        }
+
+        return "bg-muted/10 text-muted border-muted/20";
+    }
+
+    private static string GetPriorityDotClass(Priority p) => p switch
+    {
+        Models.Priority.P0 => "bg-crimson",
+        Models.Priority.P1 => "bg-coral",
+        Models.Priority.P2 => "bg-amber",
+        _ => "bg-muted"
+    };
+
+    private static string GetTypeGlyph(ItemType t) => t switch
+    {
+        ItemType.Bug => "●",
+        ItemType.Feature => "▲",
+        ItemType.Task => "■",
+        ItemType.Chore => "◆",
+        _ => "•"
+    };
+
+    private async Task HandleClick()
+    {
+        if (OnClick.HasDelegate) await OnClick.InvokeAsync();
+    }
+
+    private async Task HandleRemove()
+    {
+        if (OnRemove.HasDelegate) await OnRemove.InvokeAsync();
+    }
+}

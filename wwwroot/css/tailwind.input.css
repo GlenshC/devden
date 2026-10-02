@@ -1,0 +1,155 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: #07080a;
+    color: #ffffff;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    overflow-x: hidden;
+    min-height: 100vh;
+  }
+
+  ::selection {
+    background: rgba(255, 107, 74, 0.35);
+    color: #ffffff;
+  }
+
+  /* Custom scrollbar for dark UI */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.28);
+  }
+}
+
+@layer components {
+  /* Keycap button shadow stack */
+  .keycap {
+    background: #e6e6e6;
+    color: #2f3031;
+    border-radius: 8px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 14px;
+    padding: 8px 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.12s ease;
+    user-select: none;
+    cursor: pointer;
+    box-shadow: 0 0 0 2px #000, 0 0 14px rgba(255, 255, 255, 0.19),
+                inset 0 1px 0 #fff, inset 0 -1px 0 rgba(0, 0, 0, 0.35);
+  }
+
+  .keycap:hover {
+    background: #f0f0f0;
+    box-shadow: 0 0 0 2px #000, 0 0 18px rgba(255, 255, 255, 0.28),
+                inset 0 1px 0 #fff, inset 0 -1px 0 rgba(0, 0, 0, 0.35);
+  }
+
+  .keycap:active {
+    transform: translateY(1px);
+    box-shadow: 0 0 0 2px #000, inset 0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+
+  .keycap-sm {
+    padding: 4px 8px;
+    font-size: 12px;
+    border-radius: 6px;
+  }
+
+  /* Glass panels */
+  .glass-panel {
+    background-color: rgba(14, 15, 18, 0.72);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+  }
+
+  .glass-panel-subtle {
+    background-color: rgba(14, 15, 18, 0.45);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+  }
+
+  /* Hero Headline Accent */
+  .hero-headline-accent {
+    font-size: 64px !important;
+    font-weight: 600;
+    line-height: 1.1;
+    color: #ffffff;
+    letter-spacing: -0.03em;
+  }
+
+  .text-gradient-warm {
+    background: linear-gradient(135deg, #ffb347 0%, #ff6b4a 50%, #ff2f3a 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Aurora background blades */
+  .aurora-container {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    overflow: hidden;
+    background-color: #07080a;
+  }
+
+  .aurora-blade {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(80px);
+    mix-blend-mode: screen;
+    will-change: transform, opacity;
+  }
+
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    .aurora-blade {
+      animation: none !important;
+    }
+  }
+
+  /* Drag and drop insertion indicator */
+  .drop-indicator-top {
+    border-top: 2px solid #ff6b4a !important;
+  }
+  .drop-indicator-bottom {
+    border-bottom: 2px solid #ff6b4a !important;
+  }
+
+  /* Keyboard shortcut chip */
+  .kbd-chip {
+    font-family: 'GeistMono', monospace;
+    font-size: 11px;
+    padding: 1px 5px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 4px;
+    color: #9c9c9d;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+  }
+}

@@ -1,0 +1,74 @@
+@using Markdig
+
+<div class="flex flex-col border border-white/10 rounded-lg bg-white/[0.02] overflow-hidden @Class">
+    <!-- Header Tabs -->
+    <div class="flex items-center justify-between px-3 py-1.5 bg-white/[0.04] border-b border-white/10">
+        <div class="flex items-center gap-1">
+            <button type="button"
+                    class="px-2.5 py-1 text-xs rounded font-medium transition @(!_isPreview ? "bg-white/15 text-white shadow-sm" : "text-muted hover:text-white")"
+                    @onclick="() => _isPreview = false">
+                Write
+            </button>
+            <button type="button"
+                    class="px-2.5 py-1 text-xs rounded font-medium transition @(_isPreview ? "bg-white/15 text-white shadow-sm" : "text-muted hover:text-white")"
+                    @onclick="() => _isPreview = true">
+                Preview
+            </button>
+        </div>
+
+        <span class="text-[11px] font-mono text-muted/60">Markdown supported</span>
+    </div>
+
+    <!-- Content Area -->
+    <div class="min-h-[140px]">
+        @if (!_isPreview)
+        {
+            <textarea class="w-full h-full min-h-[140px] bg-transparent p-3 text-sm text-fg placeholder:text-muted/40 focus:outline-none resize-y font-mono leading-relaxed"
+                      placeholder="@Placeholder"
+                      value="@Value"
+                      @oninput="HandleInput">
+            </textarea>
+        }
+        else
+        {
+            <div class="p-3 text-sm text-fg/90 prose prose-invert max-w-none min-h-[140px]">
+                @if (string.IsNullOrWhiteSpace(Value))
+                {
+                    <span class="text-xs text-muted/50 italic">Nothing to preview</span>
+                }
+                else
+                {
+                    @((MarkupString)RenderMarkdown(Value))
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "Add description... (Markdown supported)";
+    [Parameter] public string Class { get; set; } = "";
+
+    private bool _isPreview = false;
+
+    private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
+        .UseAutoLinks()
+        .UseTaskLists()
+        .UseEmphasisExtras()
+        .DisableHtml() // Security: Sanitize / disable raw HTML passthrough
+        .Build();
+
+    private static string RenderMarkdown(string? raw)
+    {
+        if (string.IsNullOrEmpty(raw)) return string.Empty;
+        return Markdown.ToHtml(raw, Pipeline);
+    }
+
+    private async Task HandleInput(ChangeEventArgs e)
+    {
+        Value = e.Value?.ToString();
+        await ValueChanged.InvokeAsync(Value);
+    }
+}

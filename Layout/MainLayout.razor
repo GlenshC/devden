@@ -1,15 +1,126 @@
 @inherits LayoutComponentBase
+@inject HotkeyService Hotkeys
+@inject AppState AppState
+@inject CommandDispatcher Dispatcher
+@inject ItemService ItemService
+@inject ToastService Toast
+@implements IAsyncDisposable
 
-<div class="app-shell">
-    <nav class="topnav">
-        <div class="topnav-brand">DevDen</div>
-        <div class="topnav-links">
-            <a href="/">Projects</a>
-            <a href="/board">Board</a>
-            <a href="/list">List</a>
-        </div>
-    </nav>
-    <main class="app-main">
+<div class="relative min-h-screen flex flex-col selection:bg-coral/30 selection:text-white bg-ground text-fg">
+    <!-- Ambient Aurora Gradient Blades -->
+    <AuroraBackground />
+
+    <!-- Top Floating Pill Navigation -->
+    <PillNav />
+
+    <!-- Main View Content Area -->
+    <main class="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 py-6 pb-20">
         @Body
     </main>
+
+    <!-- Global Sliding Item Detail Panel -->
+    <DevDen.Pages.ItemDetail />
+
+    <!-- Global Command Bar Launcher (Ctrl+K) -->
+    <CommandBar />
+
+    <!-- Ephemeral Toast Notifications -->
+    <Toast />
+
+    <!-- Quick Create Item Modal (triggered via 'C' hotkey or PillNav button) -->
+    @if (_isQuickCreateOpen)
+    {
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150">
+            <div class="glass-panel w-full max-w-lg p-6 shadow-2xl border border-hairline rounded-panel" @onclick:stopPropagation="true">
+                <div class="flex items-center justify-between pb-3 border-b border-white/5 mb-4">
+                    <h3 class="text-base font-semibold text-fg flex items-center gap-2">
+                        <span>Create Item</span>
+                        <span class="font-mono text-xs text-muted">in @(AppState.ActiveProject?.Name ?? "Project")</span>
+                    </h3>
+                    <button type="button" class="text-muted hover:text-fg text-sm" @onclick="CloseQuickCreate">✕</button>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-mono text-muted uppercase tracking-wider mb-1.5">Title</label>
+                        <input id="quick-create-title"
+                               type="text"
+                               class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-fg placeholder:text-muted/50 focus:outline-none focus:border-coral/50 transition"
+                               placeholder="e.g. Implement fractional ordering algorithm"
+                               @bind="_quickTitle"
+                               @bind:event="oninput"
+                               @onkeydown="HandleTitleKeyDown" />
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-mono text-muted uppercase tracking-wider mb-1.5">Status</label>
+                            <select class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-coral/50"
+                                    @bind="_quickStatusId">
+                                @foreach (var status in AppState.ActiveStatuses)
+                                {
+                                    <option value="@status.Id">@status.Name (@status.Category)</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-mono text-muted uppercase tracking-wider mb-1.5">Type</label>
+                            <select class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-coral/50"
+                                    @bind="_quickType">
+                                @foreach (var type in Enum.GetValues<ItemType>())
+                                {
+                                    <option value="@type">@type</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-mono text-muted uppercase tracking-wider mb-1.5">Priority</label>
+                            <select class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-coral/50"
+                                    @bind="_quickPriority">
+                                @foreach (var p in Enum.GetValues<Priority>())
+                                {
+                                    <option value="@p">@p</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-mono text-muted uppercase tracking-wider mb-1.5">Milestone</label>
+                            <select class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-coral/50"
+                                    @bind="_quickMilestoneId">
+                                <option value="">None (Unscheduled)</option>
+                                @foreach (var m in AppState.ActiveMilestones)
+                                {
+                                    <option value="@m.Id">@m.Name</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 pt-1">
+                        <input id="quick-in-today"
+                               type="checkbox"
+                               class="rounded bg-white/5 border-white/10 text-coral focus:ring-coral/40"
+                               @bind="_quickInToday" />
+                        <label for="quick-in-today" class="text-xs text-fg cursor-pointer">Pin to Today list</label>
+                    </div>
+
+                    <div class="flex items-center justify-end gap-2 pt-3 border-t border-white/5">
+                        <button type="button"
+                                class="px-3 py-1.5 text-xs text-muted hover:text-fg hover:bg-white/5 rounded-lg transition"
+                                @onclick="CloseQuickCreate">
+                            Cancel
+                        </button>
+                        <KeycapButton Text="Create Item"
+                                      Shortcut="Enter"
+                                      OnClick="SubmitQuickCreate" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
 </div>

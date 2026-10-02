@@ -1,66 +1,422 @@
-@page "/item/{Number}"
+@inject AppState AppState
+@inject ItemService ItemService
+@inject ProjectService ProjectService
+@inject ToastService Toast
+@implements IDisposable
 
-<PageTitle>@Number — DevDen</PageTitle>
+@if (AppState.IsDetailOpen && CurrentItem != null)
+{
+    <!-- Slide-over Backdrop -->
+    <div class="fixed inset-0 z-40 bg-black/60 backdrop-blur-[2px] transition-opacity animate-in fade-in duration-150"
+         @onclick="Close"></div>
 
-<div class="item-detail-overlay" @onclick="CloseDetail">
-    <div class="item-detail-panel" @onclick:stopPropagation="true">
-        <div class="detail-header">
-            <div class="detail-key">DEN-@Number</div>
-            <button class="btn-ghost close-btn" @onclick="CloseDetail">✕</button>
-        </div>
-
-        <div class="detail-body">
-            <input type="text" class="detail-title-input" value="Sample item title" />
-
-            <div class="detail-section">
-                <label>Description</label>
-                <textarea class="detail-textarea" rows="8" placeholder="Add a description..."></textarea>
+    <!-- 560px Slide-over Drawer -->
+    <div class="fixed top-0 right-0 bottom-0 w-full sm:w-[560px] z-50 glass-panel border-l border-hairline flex flex-col shadow-2xl animate-in slide-in-from-right duration-200"
+         @onclick:stopPropagation="true">
+        <!-- Drawer Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-white/[0.02]">
+            <div class="flex items-center gap-3">
+                <span class="font-mono text-sm font-semibold text-coral bg-coral/10 px-2 py-0.5 rounded border border-coral/20">
+                    @(AppState.ActiveProject?.Key ?? "DEN")-@CurrentItem.Number
+                </span>
+                <span class="text-xs text-muted font-mono">
+                    @(_isSaving ? "Saving..." : "Saved")
+                </span>
             </div>
 
-            <div class="detail-sidebar">
-                <div class="detail-field">
-                    <label>Status</label>
-                    <select class="detail-select">
-                        <option>Backlog</option>
-                        <option>In Progress</option>
-                        <option>Review</option>
-                        <option>Done</option>
+            <div class="flex items-center gap-2">
+                <button type="button"
+                        class="p-1.5 rounded-lg text-xs transition @(CurrentItem.InToday ? "bg-coral/20 text-coral border border-coral/30 font-semibold" : "text-muted hover:text-fg hover:bg-white/5")"
+                        title="Pin / Unpin Today"
+                        @onclick="ToggleToday">
+                    ⚡ Today
+                </button>
+
+                <button type="button"
+                        class="p-1.5 rounded-lg text-xs text-crimson/70 hover:text-crimson hover:bg-crimson/10 transition"
+                        title="Delete Item"
+                        @onclick="DeleteItem">
+                    🗑
+                </button>
+
+                <button type="button"
+                        class="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-white/5 text-sm transition"
+                        title="Close (Esc)"
+                        @onclick="Close">
+                    ✕
+                </button>
+            </div>
+        </div>
+
+        <!-- Drawer Scrollable Body -->
+        <div class="flex-1 overflow-y-auto p-6 space-y-6">
+            <!-- Inline Title Input -->
+            <div>
+                <textarea class="w-full bg-transparent text-xl font-semibold text-fg placeholder:text-muted/40 focus:outline-none resize-none border-b border-transparent focus:border-coral/40 pb-1 transition leading-snug"
+                          rows="2"
+                          value="@_title"
+                          placeholder="Item title..."
+                          @oninput="HandleTitleChange"
+                          @onblur="PersistChanges">
+                </textarea>
+            </div>
+
+            <!-- Metadata Grid Properties -->
+            <div class="grid grid-cols-2 gap-4 bg-white/[0.02] p-4 rounded-xl border border-white/5 text-xs">
+                <!-- Status -->
+                <div>
+                    <span class="text-muted block font-mono uppercase tracking-wider text-[10px] mb-1">Status</span>
+                    <select class="w-full bg-white/5 border border-white/10 rounded-md px-2.5 py-1.5 text-xs text-fg focus:outline-none focus:border-coral/50"
+                            value="@CurrentItem.StatusId"
+                            @onchange="HandleStatusChange">
+                        @foreach (var s in AppState.ActiveStatuses)
+                        {
+                            <option value="@s.Id">@s.Name (@s.Category)</option>
+                        }
                     </select>
                 </div>
 
-                <div class="detail-field">
-                    <label>Priority</label>
-                    <select class="detail-select">
-                        <option>P0</option>
-                        <option>P1</option>
-                        <option>P2</option>
-                        <option>P3</option>
+                <!-- Priority -->
+                <div>
+                    <span class="text-muted block font-mono uppercase tracking-wider text-[10px] mb-1">Priority</span>
+                    <select class="w-full bg-white/5 border border-white/10 rounded-md px-2.5 py-1.5 text-xs text-fg focus:outline-none focus:border-coral/50"
+                            value="@CurrentItem.Priority"
+                            @onchange="HandlePriorityChange">
+                        @foreach (var p in Enum.GetValues<Priority>())
+                        {
+                            <option value="@p">@p</option>
+                        }
                     </select>
                 </div>
 
-                <div class="detail-field">
-                    <label>Type</label>
-                    <select class="detail-select">
-                        <option>Task</option>
-                        <option>Bug</option>
-                        <option>Feature</option>
-                        <option>Chore</option>
+                <!-- Type -->
+                <div>
+                    <span class="text-muted block font-mono uppercase tracking-wider text-[10px] mb-1">Type</span>
+                    <select class="w-full bg-white/5 border border-white/10 rounded-md px-2.5 py-1.5 text-xs text-fg focus:outline-none focus:border-coral/50"
+                            value="@CurrentItem.Type"
+                            @onchange="HandleTypeChange">
+                        @foreach (var t in Enum.GetValues<ItemType>())
+                        {
+                            <option value="@t">@t</option>
+                        }
                     </select>
                 </div>
+
+                <!-- Milestone -->
+                <div>
+                    <span class="text-muted block font-mono uppercase tracking-wider text-[10px] mb-1">Milestone</span>
+                    <select class="w-full bg-white/5 border border-white/10 rounded-md px-2.5 py-1.5 text-xs text-fg focus:outline-none focus:border-coral/50"
+                            value="@(CurrentItem.MilestoneId?.ToString() ?? "")"
+                            @onchange="HandleMilestoneChange">
+                        <option value="">None (Unscheduled)</option>
+                        @foreach (var m in AppState.ActiveMilestones)
+                        {
+                            <option value="@m.Id">@m.Name</option>
+                        }
+                    </select>
+                </div>
+
+                <!-- Due Date -->
+                <div>
+                    <span class="text-muted block font-mono uppercase tracking-wider text-[10px] mb-1">Due Date</span>
+                    <input type="date"
+                           class="w-full bg-white/5 border border-white/10 rounded-md px-2.5 py-1 text-xs text-fg focus:outline-none focus:border-coral/50"
+                           value="@_dueDateStr"
+                           @onchange="HandleDueDateChange" />
+                </div>
+
+                <!-- Labels Picker -->
+                <div>
+                    <span class="text-muted block font-mono uppercase tracking-wider text-[10px] mb-1">Labels</span>
+                    <div class="flex flex-wrap gap-1 items-center min-h-[28px]">
+                        @foreach (var l in AppState.ActiveLabels)
+                        {
+                            var hasLabel = CurrentItem.LabelIds.Contains(l.Id);
+                            <button type="button"
+                                    class="text-[11px] px-2 py-0.5 rounded border transition @(hasLabel ? LabelColors.GetClass(l.ColorToken) : "bg-white/5 text-muted border-white/10 hover:border-white/20")"
+                                    @onclick="() => ToggleLabel(l.Id)">
+                                @l.Name
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Description / Markdown Editor -->
+            <div>
+                <label class="block text-xs font-mono text-muted uppercase tracking-wider mb-2">Description</label>
+                <MarkdownEditor Value="@_body"
+                                ValueChanged="HandleBodyChanged"
+                                Placeholder="Add detailed notes or requirements (Markdown supported)..." />
+            </div>
+
+            <!-- Checklist -->
+            <div class="space-y-3 pt-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-mono text-muted uppercase tracking-wider">
+                        Checklist (@CurrentItem.CompletedChecklistCount/@CurrentItem.TotalChecklistCount)
+                    </span>
+                    @if (CurrentItem.HasChecklist)
+                    {
+                        <span class="font-mono text-xs text-coral">
+                            @(Math.Round(CurrentItem.Progress(false) * 100))%
+                        </span>
+                    }
+                </div>
+
+                @if (CurrentItem.HasChecklist)
+                {
+                    <ProgressBar Value="@CurrentItem.Progress(false)" ShowLabel="false" />
+
+                    <div class="space-y-1.5">
+                        @foreach (var entry in CurrentItem.Checklist.OrderBy(c => c.Order))
+                        {
+                            <div class="flex items-center justify-between gap-2 px-3 py-1.5 rounded-md bg-white/[0.02] border border-white/5 hover:border-white/10 transition group">
+                                <label class="flex items-center gap-2.5 text-xs text-fg flex-1 cursor-pointer select-none">
+                                    <input type="checkbox"
+                                           checked="@entry.Done"
+                                           class="rounded bg-white/5 border-white/20 text-coral focus:ring-0"
+                                           @onchange="() => ToggleChecklist(entry.Id)" />
+                                    <span class="@(entry.Done ? "line-through text-muted" : "text-fg")">
+                                        @entry.Text
+                                    </span>
+                                </label>
+                                <button type="button"
+                                        class="opacity-0 group-hover:opacity-100 text-muted hover:text-crimson text-xs p-0.5 transition"
+                                        @onclick="() => DeleteChecklist(entry.Id)">
+                                    ✕
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <!-- Add Checklist Item Input -->
+                <div class="flex items-center gap-2 pt-1">
+                    <input type="text"
+                           class="flex-1 bg-white/5 border border-white/10 rounded-md px-3 py-1.5 text-xs text-fg placeholder:text-muted/40 focus:outline-none focus:border-coral/50"
+                           placeholder="+ Add checklist item (Press Enter)"
+                           @bind="_newChecklistText"
+                           @bind:event="oninput"
+                           @onkeydown="HandleChecklistKeyDown" />
+                </div>
+            </div>
+
+            <!-- Activity Log Stream -->
+            <div class="border-t border-white/5 pt-4 space-y-2">
+                <button type="button"
+                        class="flex items-center justify-between w-full text-xs font-mono text-muted uppercase tracking-wider hover:text-fg transition"
+                        @onclick="() => _isActivityCollapsed = !_isActivityCollapsed">
+                    <span>Activity Log (@_activities.Count)</span>
+                    <span>@(_isActivityCollapsed ? "▼" : "▲")</span>
+                </button>
+
+                @if (!_isActivityCollapsed)
+                {
+                    <div class="space-y-2 pt-2 max-h-48 overflow-y-auto">
+                        @if (_activities.Count == 0)
+                        {
+                            <div class="text-xs text-muted/50 italic py-2">No activity recorded yet</div>
+                        }
+                        else
+                        {
+                            @foreach (var act in _activities.TakeLast(20).Reverse())
+                            {
+                                <div class="text-xs flex items-start gap-2 text-muted">
+                                    <span class="font-mono text-[10px] opacity-60 flex-shrink-0 pt-0.5">
+                                        @act.At.ToLocalTime().ToString("MMM dd HH:mm")
+                                    </span>
+                                    <span class="text-fg/80">
+                                        @GetActivityText(act)
+                                    </span>
+                                </div>
+                            }
+                        }
+                    </div>
+                }
             </div>
         </div>
     </div>
-</div>
+}
 
 @code {
-    [Parameter]
-    public string Number { get; set; } = "1";
+    private Item? CurrentItem => AppState.SelectedItem;
+    private string _title = "";
+    private string? _body;
+    private string _dueDateStr = "";
+    private string _newChecklistText = "";
+    private bool _isSaving = false;
+    private bool _isActivityCollapsed = true;
+    private List<ActivityEntry> _activities = new();
 
-    [Inject]
-    private NavigationManager Nav { get; set; } = default!;
+    private CancellationTokenSource? _debounceCts;
 
-    private void CloseDetail()
+    protected override void OnInitialized()
     {
-        Nav.NavigateTo("/board");
+        AppState.OnChange += HandleStateChanged;
+    }
+
+    private void HandleStateChanged()
+    {
+        if (CurrentItem != null)
+        {
+            _title = CurrentItem.Title;
+            _body = CurrentItem.Body;
+            _dueDateStr = CurrentItem.DueDate?.ToString("yyyy-MM-dd") ?? "";
+
+            if (AppState.ActiveProjectId.HasValue && AppState.ActivityByProject.TryGetValue(AppState.ActiveProjectId.Value, out var actList))
+            {
+                _activities = actList.Where(a => a.ItemId == CurrentItem.Id).ToList();
+            }
+            else
+            {
+                _activities = new();
+            }
+        }
+        StateHasChanged();
+    }
+
+    private void HandleTitleChange(ChangeEventArgs e)
+    {
+        _title = e.Value?.ToString() ?? "";
+        TriggerDebouncedSave();
+    }
+
+    private async Task HandleBodyChanged(string? newBody)
+    {
+        _body = newBody;
+        TriggerDebouncedSave();
+    }
+
+    private void TriggerDebouncedSave()
+    {
+        _isSaving = true;
+        _debounceCts?.Cancel();
+        _debounceCts = new CancellationTokenSource();
+        var token = _debounceCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(500, token);
+                if (!token.IsCancellationRequested)
+                {
+                    await InvokeAsync(() =>
+                    {
+                        PersistChanges();
+                        _isSaving = false;
+                        StateHasChanged();
+                    });
+                }
+            }
+            catch (TaskCanceledException) { }
+        }, token);
+    }
+
+    private void PersistChanges()
+    {
+        if (CurrentItem == null) return;
+
+        ItemService.UpdateItem(CurrentItem.Id, new ItemPatch(
+            Title: _title,
+            Body: _body
+        ));
+    }
+
+    private void HandleStatusChange(ChangeEventArgs e)
+    {
+        if (CurrentItem == null || !Guid.TryParse(e.Value?.ToString(), out var newStatusId)) return;
+        ItemService.MoveItem(CurrentItem.Id, newStatusId);
+    }
+
+    private void HandlePriorityChange(ChangeEventArgs e)
+    {
+        if (CurrentItem == null || !Enum.TryParse<Priority>(e.Value?.ToString(), out var p)) return;
+        ItemService.UpdateItem(CurrentItem.Id, new ItemPatch(Priority: p));
+    }
+
+    private void HandleTypeChange(ChangeEventArgs e)
+    {
+        if (CurrentItem == null || !Enum.TryParse<ItemType>(e.Value?.ToString(), out var t)) return;
+        ItemService.UpdateItem(CurrentItem.Id, new ItemPatch(Type: t));
+    }
+
+    private void HandleMilestoneChange(ChangeEventArgs e)
+    {
+        if (CurrentItem == null) return;
+        Guid? mId = Guid.TryParse(e.Value?.ToString(), out var parsed) ? parsed : null;
+        ItemService.UpdateItem(CurrentItem.Id, new ItemPatch(MilestoneId: mId));
+    }
+
+    private void HandleDueDateChange(ChangeEventArgs e)
+    {
+        if (CurrentItem == null) return;
+        DateOnly? d = DateOnly.TryParse(e.Value?.ToString(), out var parsed) ? parsed : null;
+        ItemService.UpdateItem(CurrentItem.Id, new ItemPatch(DueDate: d));
+    }
+
+    private void ToggleLabel(Guid labelId)
+    {
+        if (CurrentItem == null) return;
+        var list = new List<Guid>(CurrentItem.LabelIds);
+        if (list.Contains(labelId)) list.Remove(labelId);
+        else list.Add(labelId);
+
+        ItemService.UpdateItem(CurrentItem.Id, new ItemPatch(LabelIds: list));
+    }
+
+    private void ToggleToday()
+    {
+        if (CurrentItem == null) return;
+        ItemService.ToggleToday(CurrentItem.Id);
+    }
+
+    private void DeleteItem()
+    {
+        if (CurrentItem == null) return;
+        ItemService.DeleteItem(CurrentItem.Id);
+    }
+
+    private void HandleChecklistKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_newChecklistText) && CurrentItem != null)
+        {
+            ItemService.AddChecklistEntry(CurrentItem.Id, _newChecklistText);
+            _newChecklistText = "";
+        }
+    }
+
+    private void ToggleChecklist(Guid entryId)
+    {
+        if (CurrentItem == null) return;
+        ItemService.ToggleChecklistEntry(CurrentItem.Id, entryId);
+    }
+
+    private void DeleteChecklist(Guid entryId)
+    {
+        if (CurrentItem == null) return;
+        ItemService.DeleteChecklistEntry(CurrentItem.Id, entryId);
+    }
+
+    private static string GetActivityText(ActivityEntry act) => act.Kind switch
+    {
+        ActivityKind.Created => "Created item",
+        ActivityKind.StatusChanged => $"Changed status from {act.From} to {act.To}",
+        ActivityKind.PriorityChanged => $"Changed priority from {act.From} to {act.To}",
+        ActivityKind.Completed => "Marked as completed",
+        _ => "Updated item"
+    };
+
+    private void Close()
+    {
+        PersistChanges();
+        AppState.CloseDetail();
+    }
+
+    public void Dispose()
+    {
+        AppState.OnChange -= HandleStateChanged;
+        _debounceCts?.Dispose();
     }
 }

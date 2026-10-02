@@ -1,73 +1,422 @@
-@page "/list"
+@page "/p/{ProjectKey}/list"
+@inject AppState AppState
+@inject ItemService ItemService
+@inject CommandDispatcher Dispatcher
+@inject IJSRuntime JS
+@implements IDisposable
 
-<PageTitle>List — DevDen</PageTitle>
+<PageTitle>List — @(AppState.ActiveProject?.Name ?? "DevDen")</PageTitle>
 
-<div class="list-page">
-    <div class="list-header">
-        <h1>DEN — All Items</h1>
-        <button class="btn-primary">+ New Item</button>
+@if (AppState.ActiveProject == null)
+{
+    <div class="py-12 text-center text-muted">
+        Loading project list...
     </div>
+}
+else
+{
+    <div class="space-y-4">
+        <!-- List Header & Filter Controls -->
+        <div class="glass-panel p-4 rounded-panel border border-hairline space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <!-- Search Input -->
+                <div class="relative flex-1 max-w-md">
+                    <span class="absolute left-3 top-2.5 text-muted text-xs">🔍</span>
+                    <input id="list-search-input"
+                           type="text"
+                           class="w-full bg-white/5 border border-white/10 rounded-lg pl-8 pr-3 py-1.5 text-xs text-fg placeholder:text-muted/50 focus:outline-none focus:border-coral/50 transition"
+                           placeholder="Filter items by title or description... (/ to focus)"
+                           @bind="_searchQuery"
+                           @bind:event="oninput" />
+                </div>
 
-    <table class="item-table">
-        <thead>
-            <tr>
-                <th>Key</th>
-                <th>Title</th>
-                <th>Status</th>
-                <th>Priority</th>
-                <th>Type</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td class="cell-key">DEN-0</td>
-                <td class="cell-title done">Bootstrap Blazor WASM project</td>
-                <td><span class="status-badge done">Done</span></td>
-                <td><span class="priority-dot p3"></span></td>
-                <td><span class="type-badge">Chore</span></td>
-            </tr>
-            <tr>
-                <td class="cell-key">DEN-1</td>
-                <td class="cell-title">Set up project structure and routing</td>
-                <td><span class="status-badge backlog">Backlog</span></td>
-                <td><span class="priority-dot p2"></span></td>
-                <td><span class="type-badge">Task</span></td>
-            </tr>
-            <tr>
-                <td class="cell-key">DEN-2</td>
-                <td class="cell-title">Design data models for projects and items</td>
-                <td><span class="status-badge backlog">Backlog</span></td>
-                <td><span class="priority-dot p1"></span></td>
-                <td><span class="type-badge">Feature</span></td>
-            </tr>
-            <tr>
-                <td class="cell-key">DEN-3</td>
-                <td class="cell-title">Research localStorage vs IndexedDB for persistence</td>
-                <td><span class="status-badge backlog">Backlog</span></td>
-                <td><span class="priority-dot p3"></span></td>
-                <td><span class="type-badge">Chore</span></td>
-            </tr>
-            <tr>
-                <td class="cell-key">DEN-4</td>
-                <td class="cell-title">Build kanban board UI with static data</td>
-                <td><span class="status-badge active">In Progress</span></td>
-                <td><span class="priority-dot p1"></span></td>
-                <td><span class="type-badge">Feature</span></td>
-            </tr>
-            <tr>
-                <td class="cell-key">DEN-5</td>
-                <td class="cell-title">Write plain CSS design tokens</td>
-                <td><span class="status-badge active">In Progress</span></td>
-                <td><span class="priority-dot p2"></span></td>
-                <td><span class="type-badge">Chore</span></td>
-            </tr>
-            <tr>
-                <td class="cell-key">DEN-6</td>
-                <td class="cell-title">Verify Blazor WASM build output and asset pipeline</td>
-                <td><span class="status-badge review">Review</span></td>
-                <td><span class="priority-dot p0"></span></td>
-                <td><span class="type-badge">Bug</span></td>
-            </tr>
-        </tbody>
-    </table>
-</div>
+                <!-- Group By & Sort Dropdowns -->
+                <div class="flex items-center gap-2 text-xs">
+                    <span class="text-muted font-mono uppercase tracking-wider text-[10px]">Group:</span>
+                    <select class="bg-white/5 border border-white/10 rounded-md px-2.5 py-1 text-xs text-fg focus:outline-none focus:border-coral/50"
+                            @bind="_groupBy">
+                        <option value="none">None</option>
+                        <option value="status">Status</option>
+                        <option value="priority">Priority</option>
+                        <option value="type">Type</option>
+                        <option value="milestone">Milestone</option>
+                    </select>
+
+                    <span class="text-muted font-mono uppercase tracking-wider text-[10px] ml-2">Sort:</span>
+                    <select class="bg-white/5 border border-white/10 rounded-md px-2.5 py-1 text-xs text-fg focus:outline-none focus:border-coral/50"
+                            @bind="_sortBy">
+                        <option value="number">Key Number</option>
+                        <option value="title">Title</option>
+                        <option value="priority">Priority</option>
+                        <option value="due">Due Date</option>
+                        <option value="updated">Last Updated</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Filter Chips (Type, Priority, Status) -->
+            <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-white/5 text-xs">
+                <span class="text-muted font-mono uppercase tracking-wider text-[10px]">Filters:</span>
+
+                <!-- Type Filters -->
+                @foreach (var type in Enum.GetValues<ItemType>())
+                {
+                    var isSelected = _selectedTypes.Contains(type);
+                    <button type="button"
+                            class="px-2 py-0.5 rounded text-[11px] border transition @(isSelected ? "bg-coral/20 text-coral border-coral/40 font-medium" : "bg-white/5 text-muted border-white/10 hover:border-white/20")"
+                            @onclick="() => ToggleTypeFilter(type)">
+                        @type
+                    </button>
+                }
+
+                <span class="text-white/10">|</span>
+
+                <!-- Priority Filters -->
+                @foreach (var p in Enum.GetValues<Priority>())
+                {
+                    var isSelected = _selectedPriorities.Contains(p);
+                    <button type="button"
+                            class="px-2 py-0.5 rounded text-[11px] border transition @(isSelected ? "bg-amber/20 text-amber border-amber/40 font-medium" : "bg-white/5 text-muted border-white/10 hover:border-white/20")"
+                            @onclick="() => TogglePriorityFilter(p)">
+                        @p
+                    </button>
+                }
+
+                @if (_selectedTypes.Count > 0 || _selectedPriorities.Count > 0 || !string.IsNullOrEmpty(_searchQuery))
+                {
+                    <button type="button"
+                            class="text-[10px] text-muted hover:text-crimson transition underline ml-auto"
+                            @onclick="ClearFilters">
+                        Reset Filters
+                    </button>
+                }
+            </div>
+        </div>
+
+        <!-- Bulk Selection Action Bar -->
+        @if (_selectedItemIds.Count > 0)
+        {
+            <div class="glass-panel p-3 rounded-panel border border-coral/30 flex items-center justify-between animate-in fade-in duration-100 bg-coral/[0.04]">
+                <div class="flex items-center gap-2 text-xs font-semibold text-fg">
+                    <span class="bg-coral text-black px-2 py-0.5 rounded-full font-mono text-[11px]">
+                        @_selectedItemIds.Count
+                    </span>
+                    <span>items selected</span>
+                </div>
+
+                <div class="flex items-center gap-2 text-xs">
+                    <!-- Bulk Status -->
+                    <select class="bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-fg"
+                            @onchange="HandleBulkStatus">
+                        <option value="">Set Status...</option>
+                        @foreach (var s in AppState.ActiveStatuses)
+                        {
+                            <option value="@s.Id">@s.Name</option>
+                        }
+                    </select>
+
+                    <!-- Bulk Priority -->
+                    <select class="bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-fg"
+                            @onchange="HandleBulkPriority">
+                        <option value="">Set Priority...</option>
+                        @foreach (var p in Enum.GetValues<Priority>())
+                        {
+                            <option value="@p">@p</option>
+                        }
+                    </select>
+
+                    <!-- Bulk Delete -->
+                    <button type="button"
+                            class="px-2.5 py-1 rounded bg-crimson/20 hover:bg-crimson/30 text-crimson font-medium transition"
+                            @onclick="HandleBulkDelete">
+                        Delete
+                    </button>
+
+                    <button type="button"
+                            class="text-muted hover:text-fg text-xs p-1"
+                            @onclick="() => _selectedItemIds.Clear()">
+                        ✕
+                    </button>
+                </div>
+            </div>
+        }
+
+        <!-- Dense Table View -->
+        <div class="glass-panel rounded-panel border border-hairline overflow-hidden shadow-xl">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-white/10 bg-white/[0.02] text-[10px] font-mono uppercase tracking-wider text-muted select-none">
+                            <th class="px-3 py-2.5 w-8 text-center">
+                                <input type="checkbox"
+                                       checked="@(IsAllSelected && FilteredItems.Count > 0)"
+                                       class="rounded bg-white/5 border-white/20 text-coral focus:ring-0"
+                                       @onchange="ToggleSelectAll" />
+                            </th>
+                            <th class="px-3 py-2.5 w-24 cursor-pointer hover:text-fg" @onclick="@(() => SetSort("number"))">
+                                Key @GetSortIndicator("number")
+                            </th>
+                            <th class="px-3 py-2.5 cursor-pointer hover:text-fg" @onclick="@(() => SetSort("title"))">
+                                Title @GetSortIndicator("title")
+                            </th>
+                            <th class="px-3 py-2.5 w-36">Status</th>
+                            <th class="px-3 py-2.5 w-24 cursor-pointer hover:text-fg" @onclick="@(() => SetSort("priority"))">
+                                Priority @GetSortIndicator("priority")
+                            </th>
+                            <th class="px-3 py-2.5 max-w-[140px]">Labels</th>
+                            <th class="px-3 py-2.5 max-w-[120px]">Milestone</th>
+                            <th class="px-3 py-2.5 w-24 cursor-pointer hover:text-fg" @onclick="@(() => SetSort("due"))">
+                                Due @GetSortIndicator("due")
+                            </th>
+                            <th class="px-3 py-2.5 w-24 text-right cursor-pointer hover:text-fg" @onclick="@(() => SetSort("updated"))">
+                                Updated @GetSortIndicator("updated")
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (FilteredItems.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="9" class="text-center py-12 text-muted text-xs">
+                                    No items match current filters
+                                </td>
+                            </tr>
+                        }
+                        else if (_groupBy == "status")
+                        {
+                            @foreach (var status in AppState.ActiveStatuses.OrderBy(s => s.Order))
+                            {
+                                var groupItems = FilteredItems.Where(i => i.StatusId == status.Id).ToList();
+                                if (groupItems.Count > 0)
+                                {
+                                    <tr class="bg-white/[0.03] border-b border-white/5 text-[11px] font-mono font-semibold text-fg">
+                                        <td colspan="9" class="px-3 py-2">
+                                            @status.Name (@groupItems.Count)
+                                        </td>
+                                    </tr>
+                                    @foreach (var item in groupItems)
+                                    {
+                                        <ItemRow Item="@item"
+                                                 IsSelected="@_selectedItemIds.Contains(item.Id)"
+                                                 OnSelectedChanged="(val) => HandleRowSelected(item.Id, val)" />
+                                    }
+                                }
+                            }
+                        }
+                        else if (_groupBy == "priority")
+                        {
+                            @foreach (var p in Enum.GetValues<Priority>())
+                            {
+                                var groupItems = FilteredItems.Where(i => i.Priority == p).ToList();
+                                if (groupItems.Count > 0)
+                                {
+                                    <tr class="bg-white/[0.03] border-b border-white/5 text-[11px] font-mono font-semibold text-fg">
+                                        <td colspan="9" class="px-3 py-2">
+                                            Priority @p (@groupItems.Count)
+                                        </td>
+                                    </tr>
+                                    @foreach (var item in groupItems)
+                                    {
+                                        <ItemRow Item="@item"
+                                                 IsSelected="@_selectedItemIds.Contains(item.Id)"
+                                                 OnSelectedChanged="(val) => HandleRowSelected(item.Id, val)" />
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            @foreach (var item in FilteredItems)
+                            {
+                                <ItemRow Item="@item"
+                                         IsSelected="@_selectedItemIds.Contains(item.Id)"
+                                         OnSelectedChanged="(val) => HandleRowSelected(item.Id, val)" />
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Footer Stats -->
+            <div class="px-4 py-2.5 border-t border-white/5 bg-white/[0.01] flex items-center justify-between text-[11px] font-mono text-muted">
+                <span>Showing @FilteredItems.Count of @AppState.ActiveItems.Count items</span>
+                <span>Press / to search</span>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string ProjectKey { get; set; } = "";
+
+    private string _searchQuery = "";
+    private string _groupBy = "none";
+    private string _sortBy = "number";
+    private bool _sortDesc = false;
+
+    private readonly HashSet<ItemType> _selectedTypes = new();
+    private readonly HashSet<Priority> _selectedPriorities = new();
+    private readonly HashSet<Guid> _selectedItemIds = new();
+
+    private bool IsAllSelected => FilteredItems.Count > 0 && FilteredItems.All(i => _selectedItemIds.Contains(i.Id));
+
+    protected override void OnInitialized()
+    {
+        AppState.OnChange += StateHasChanged;
+        Dispatcher.OnFocusFilterInput += HandleFocusFilter;
+        SyncProject();
+    }
+
+    protected override void OnParametersSet()
+    {
+        SyncProject();
+    }
+
+    private void SyncProject()
+    {
+        if (!string.IsNullOrEmpty(ProjectKey))
+        {
+            AppState.SetActiveProjectByKey(ProjectKey);
+        }
+    }
+
+    private void HandleFocusFilter()
+    {
+        _ = JS.InvokeVoidAsync("denUtils.focusElement", "list-search-input");
+    }
+
+    private List<Item> FilteredItems
+    {
+        get
+        {
+            var query = AppState.ActiveItems.AsEnumerable();
+
+            // Text search
+            if (!string.IsNullOrWhiteSpace(_searchQuery))
+            {
+                var q = _searchQuery.Trim();
+                query = query.Where(i => i.Title.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                                         (i.Body?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false));
+            }
+
+            // Type filter
+            if (_selectedTypes.Count > 0)
+            {
+                query = query.Where(i => _selectedTypes.Contains(i.Type));
+            }
+
+            // Priority filter
+            if (_selectedPriorities.Count > 0)
+            {
+                query = query.Where(i => _selectedPriorities.Contains(i.Priority));
+            }
+
+            // Sort
+            query = _sortBy switch
+            {
+                "title" => _sortDesc ? query.OrderByDescending(i => i.Title) : query.OrderBy(i => i.Title),
+                "priority" => _sortDesc ? query.OrderByDescending(i => i.Priority) : query.OrderBy(i => i.Priority),
+                "due" => _sortDesc ? query.OrderByDescending(i => i.DueDate) : query.OrderBy(i => i.DueDate),
+                "updated" => _sortDesc ? query.OrderByDescending(i => i.UpdatedAt) : query.OrderBy(i => i.UpdatedAt),
+                _ => _sortDesc ? query.OrderByDescending(i => i.Number) : query.OrderBy(i => i.Number)
+            };
+
+            return query.ToList();
+        }
+    }
+
+    private void SetSort(string column)
+    {
+        if (_sortBy == column)
+        {
+            _sortDesc = !_sortDesc;
+        }
+        else
+        {
+            _sortBy = column;
+            _sortDesc = false;
+        }
+    }
+
+    private string GetSortIndicator(string col)
+    {
+        if (_sortBy != col) return "";
+        return _sortDesc ? "▼" : "▲";
+    }
+
+    private void ToggleTypeFilter(ItemType type)
+    {
+        if (_selectedTypes.Contains(type)) _selectedTypes.Remove(type);
+        else _selectedTypes.Add(type);
+    }
+
+    private void TogglePriorityFilter(Priority p)
+    {
+        if (_selectedPriorities.Contains(p)) _selectedPriorities.Remove(p);
+        else _selectedPriorities.Add(p);
+    }
+
+    private void ClearFilters()
+    {
+        _searchQuery = "";
+        _selectedTypes.Clear();
+        _selectedPriorities.Clear();
+    }
+
+    private void HandleRowSelected(Guid id, bool selected)
+    {
+        if (selected) _selectedItemIds.Add(id);
+        else _selectedItemIds.Remove(id);
+    }
+
+    private void ToggleSelectAll(ChangeEventArgs e)
+    {
+        if (e.Value is true)
+        {
+            foreach (var item in FilteredItems) _selectedItemIds.Add(item.Id);
+        }
+        else
+        {
+            _selectedItemIds.Clear();
+        }
+    }
+
+    private void HandleBulkStatus(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var sId))
+        {
+            foreach (var id in _selectedItemIds.ToList())
+            {
+                ItemService.MoveItem(id, sId);
+            }
+            _selectedItemIds.Clear();
+        }
+    }
+
+    private void HandleBulkPriority(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<Priority>(e.Value?.ToString(), out var p))
+        {
+            foreach (var id in _selectedItemIds.ToList())
+            {
+                ItemService.UpdateItem(id, new ItemPatch(Priority: p));
+            }
+            _selectedItemIds.Clear();
+        }
+    }
+
+    private void HandleBulkDelete()
+    {
+        foreach (var id in _selectedItemIds.ToList())
+        {
+            ItemService.DeleteItem(id);
+        }
+        _selectedItemIds.Clear();
+    }
+
+    public void Dispose()
+    {
+        AppState.OnChange -= StateHasChanged;
+        Dispatcher.OnFocusFilterInput -= HandleFocusFilter;
+    }
+}

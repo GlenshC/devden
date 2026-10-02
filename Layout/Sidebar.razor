@@ -1,0 +1,109 @@
+@inject AppState AppState
+@inject CommandDispatcher Dispatcher
+@inject NavigationManager Nav
+@implements IDisposable
+
+@if (IsOpen)
+{
+    <div class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden" @onclick="OnClose"></div>
+
+    <aside class="fixed top-0 left-0 bottom-0 w-64 z-50 glass-panel border-r border-hairline p-4 flex flex-col justify-between animate-in slide-in-from-left duration-200">
+        <div>
+            <!-- Header -->
+            <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/5">
+                <div class="flex items-center gap-2">
+                    <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-amber via-coral to-crimson flex items-center justify-center font-mono font-bold text-xs text-black">
+                        DEN
+                    </div>
+                    <span class="font-bold text-fg tracking-tight">DevDen</span>
+                </div>
+                <button type="button" class="text-muted hover:text-fg text-sm p-1" @onclick="OnClose">✕</button>
+            </div>
+
+            <!-- Views -->
+            <div class="space-y-1 mb-6">
+                <div class="text-[10px] font-mono uppercase text-muted tracking-wider px-2 mb-1">Views</div>
+                @if (AppState.ActiveProject != null)
+                {
+                    <a href="@($"/p/{AppState.ActiveProject.Key}/board")"
+                       class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-fg hover:bg-white/5 transition"
+                       @onclick="OnClose">
+                        <span>📋</span> Board
+                    </a>
+                    <a href="@($"/p/{AppState.ActiveProject.Key}/list")"
+                       class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-fg hover:bg-white/5 transition"
+                       @onclick="OnClose">
+                        <span>📑</span> List
+                    </a>
+                    <a href="@($"/p/{AppState.ActiveProject.Key}/roadmap")"
+                       class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-fg hover:bg-white/5 transition"
+                       @onclick="OnClose">
+                        <span>🎯</span> Roadmap
+                    </a>
+                }
+                <a href="/today"
+                   class="flex items-center justify-between px-3 py-2 rounded-lg text-sm text-fg hover:bg-white/5 transition"
+                   @onclick="OnClose">
+                    <div class="flex items-center gap-2.5">
+                        <span>⚡</span> Today
+                    </div>
+                    @if (AppState.AllTodayItems.Count > 0)
+                    {
+                        <span class="font-mono text-xs px-1.5 py-0.5 rounded bg-coral/20 text-coral">
+                            @AppState.AllTodayItems.Count
+                        </span>
+                    }
+                </a>
+            </div>
+
+            <!-- Projects -->
+            <div>
+                <div class="text-[10px] font-mono uppercase text-muted tracking-wider px-2 mb-1">Projects</div>
+                <div class="space-y-1 max-h-48 overflow-y-auto">
+                    @foreach (var p in AppState.Projects)
+                    {
+                        <button type="button"
+                                class="w-full text-left flex items-center justify-between px-3 py-2 rounded-lg text-sm hover:bg-white/5 transition @(p.Id == AppState.ActiveProjectId ? "bg-coral/10 text-coral font-medium" : "text-muted hover:text-fg")"
+                                @onclick="() => SelectProject(p)">
+                            <span class="truncate">@p.Name</span>
+                            <span class="font-mono text-xs opacity-60">@p.Key</span>
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="pt-4 border-t border-white/5 space-y-2">
+            <a href="/settings"
+               class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted hover:text-fg hover:bg-white/5 transition"
+               @onclick="OnClose">
+                <span>⚙</span> Settings
+            </a>
+            <div class="text-[11px] text-muted/60 font-mono px-3">
+                DevDen WASM v0.1
+            </div>
+        </div>
+    </aside>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    protected override void OnInitialized()
+    {
+        AppState.OnChange += StateHasChanged;
+    }
+
+    private void SelectProject(Project p)
+    {
+        Dispatcher.SwitchProject(p.Id);
+        OnClose.InvokeAsync();
+    }
+
+    public void Dispose()
+    {
+        AppState.OnChange -= StateHasChanged;
+    }
+}

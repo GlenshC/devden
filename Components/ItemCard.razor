@@ -1,0 +1,102 @@
+@inject AppState AppState
+
+<div class="glass-panel p-3.5 mb-2.5 rounded-panel border border-hairline hover:border-white/20 transition-all cursor-grab active:cursor-grabbing group relative select-none @(IsDone ? "opacity-60" : "") @Class"
+     draggable="true"
+     @ondragstart="HandleDragStart"
+     @ondragend="HandleDragEnd"
+     @onclick="HandleCardClick">
+
+    <!-- Card Header: Mono Key, Type & Priority Dot -->
+    <div class="flex items-center justify-between mb-1.5">
+        <div class="flex items-center gap-1.5">
+            <span class="font-mono text-xs font-semibold text-muted group-hover:text-coral transition-colors">
+                @(AppState.ActiveProject?.Key ?? "DEN")-@Item.Number
+            </span>
+            <Chip Type="@Item.Type" Class="text-[10px] py-0 px-1.5" />
+        </div>
+
+        <div class="flex items-center gap-1.5">
+            @if (Item.InToday)
+            {
+                <span class="text-[11px] text-coral" title="Pinned to Today">⚡</span>
+            }
+            <Chip Priority="@Item.Priority" Class="text-[10px] py-0 px-1.5" />
+        </div>
+    </div>
+
+    <!-- Title (2-line clamp) -->
+    <h4 class="text-sm font-medium leading-snug line-clamp-2 mb-2 text-fg group-hover:text-white transition-colors @(IsDone ? "line-through text-muted" : "")">
+        @Item.Title
+    </h4>
+
+    <!-- Card Footer: Labels, Checklist & Due Date -->
+    <div class="flex items-center justify-between pt-1 border-t border-white/5 text-[11px] text-muted">
+        <!-- Labels -->
+        <div class="flex items-center gap-1 overflow-hidden max-w-[60%]">
+            @if (Item.LabelIds.Count > 0 && AppState.ActiveProject != null)
+            {
+                var labels = AppState.ActiveLabels.Where(l => Item.LabelIds.Contains(l.Id)).ToList();
+                @foreach (var l in labels.Take(2))
+                {
+                    <span class="text-[10px] px-1.5 py-0.2 rounded border truncate max-w-[80px] @LabelColors.GetClass(l.ColorToken)">
+                        @l.Name
+                    </span>
+                }
+                @if (labels.Count > 2)
+                {
+                    <span class="text-[10px] font-mono text-muted/70">+@(labels.Count - 2)</span>
+                }
+            }
+        </div>
+
+        <!-- Right stats: Checklist & Due Date -->
+        <div class="flex items-center gap-2 font-mono text-[10px]">
+            @if (Item.HasChecklist)
+            {
+                <span class="flex items-center gap-1 text-muted">
+                    <span>✓</span>
+                    <span>@Item.CompletedChecklistCount/@Item.TotalChecklistCount</span>
+                </span>
+            }
+
+            @if (Item.DueDate.HasValue)
+            {
+                <span class="@(IsOverdue ? "text-crimson font-bold" : "text-muted")">
+                    @Item.DueDate.Value.ToString("MMM dd")
+                </span>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public Item Item { get; set; } = default!;
+    [Parameter] public bool IsDone { get; set; }
+    [Parameter] public string Class { get; set; } = "";
+    [Parameter] public EventCallback<Item> OnClick { get; set; }
+    [Parameter] public EventCallback<Item> OnDragStart { get; set; }
+
+    private bool IsOverdue => Item.DueDate.HasValue && Item.DueDate.Value < DateOnly.FromDateTime(DateTime.Today) && !IsDone;
+
+    private void HandleCardClick()
+    {
+        if (OnClick.HasDelegate)
+        {
+            OnClick.InvokeAsync(Item);
+        }
+        else
+        {
+            AppState.SetSelectedItem(Item);
+        }
+    }
+
+    private void HandleDragStart(DragEventArgs e)
+    {
+        OnDragStart.InvokeAsync(Item);
+    }
+
+    private void HandleDragEnd(DragEventArgs e)
+    {
+        // Cleanup drag states
+    }
+}

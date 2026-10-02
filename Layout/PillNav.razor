@@ -1,0 +1,161 @@
+@inject AppState AppState
+@inject CommandDispatcher Dispatcher
+@inject NavigationManager Nav
+@implements IDisposable
+
+<nav class="sticky top-4 z-40 max-w-5xl mx-auto px-4 w-full">
+    <div class="glass-panel flex items-center justify-between px-3 py-2 shadow-2xl border border-hairline">
+        <!-- Left: Project Switcher Dropdown -->
+        <div class="relative flex items-center gap-2">
+            <a href="/" class="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-white/5 transition" title="DevDen Home">
+                <div class="w-6 h-6 rounded-md bg-gradient-to-br from-amber via-coral to-crimson flex items-center justify-center font-mono font-bold text-[10px] text-black shadow-sm">
+                    @(AppState.ActiveProject?.Key.Substring(0, Math.Min(2, AppState.ActiveProject?.Key.Length ?? 0)) ?? "DEN")
+                </div>
+            </a>
+
+            <div class="relative">
+                <button type="button"
+                        class="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm font-medium hover:bg-white/5 transition border border-transparent hover:border-hairline"
+                        @onclick="ToggleProjectDropdown">
+                    <span class="text-fg font-semibold truncate max-w-[140px]">
+                        @(AppState.ActiveProject?.Name ?? "Select Project")
+                    </span>
+                    <span class="text-[10px] text-muted">▼</span>
+                </button>
+
+                @if (_isProjectDropdownOpen)
+                {
+                    <!-- Backdrop to dismiss -->
+                    <div class="fixed inset-0 z-40" @onclick="() => _isProjectDropdownOpen = false"></div>
+
+                    <div class="absolute left-0 mt-2 w-56 rounded-panel glass-panel shadow-2xl border border-hairline py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
+                        <div class="px-3 py-1.5 text-[11px] font-mono uppercase text-muted tracking-wider border-b border-white/5">
+                            Projects
+                        </div>
+                        <div class="max-h-56 overflow-y-auto py-1">
+                            @foreach (var proj in AppState.Projects)
+                            {
+                                <button type="button"
+                                        class="w-full text-left px-3 py-2 text-sm flex items-center justify-between hover:bg-white/5 transition @(proj.Id == AppState.ActiveProjectId ? "text-coral font-semibold bg-coral/5" : "text-fg")"
+                                        @onclick="() => SelectProject(proj)">
+                                    <span class="truncate">@proj.Name</span>
+                                    <span class="font-mono text-xs text-muted ml-2">@proj.Key</span>
+                                </button>
+                            }
+                        </div>
+                        <div class="border-t border-white/5 pt-1 px-1">
+                            <button type="button"
+                                    class="w-full text-left px-2.5 py-1.5 text-xs text-muted hover:text-fg hover:bg-white/5 rounded flex items-center gap-2 transition"
+                                    @onclick="HandleNewProject">
+                                <span>+</span> Create new project
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Center: View Mode Tabs (Board / List / Roadmap) -->
+        @if (AppState.ActiveProject != null)
+        {
+            <div class="hidden md:flex items-center gap-1 bg-white/[0.04] p-1 rounded-lg border border-hairline">
+                <a href="@($"/p/{AppState.ActiveProject.Key}/board")"
+                   class="px-3 py-1 rounded text-xs font-medium transition-all @(IsActiveView("board") ? "bg-white/15 text-white shadow-sm" : "text-muted hover:text-white hover:bg-white/5")">
+                    Board
+                </a>
+                <a href="@($"/p/{AppState.ActiveProject.Key}/list")"
+                   class="px-3 py-1 rounded text-xs font-medium transition-all @(IsActiveView("list") ? "bg-white/15 text-white shadow-sm" : "text-muted hover:text-white hover:bg-white/5")">
+                    List
+                </a>
+                <a href="@($"/p/{AppState.ActiveProject.Key}/roadmap")"
+                   class="px-3 py-1 rounded text-xs font-medium transition-all @(IsActiveView("roadmap") ? "bg-white/15 text-white shadow-sm" : "text-muted hover:text-white hover:bg-white/5")">
+                    Roadmap
+                </a>
+            </div>
+        }
+
+        <!-- Right: Today, Hotkey Hint, New Item, Settings -->
+        <div class="flex items-center gap-2">
+            <a href="/today"
+               class="px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1.5 transition @(IsActiveRoute("/today") ? "bg-white/15 text-white" : "text-muted hover:text-white hover:bg-white/5")">
+                <span>Today</span>
+                @if (AppState.AllTodayItems.Count > 0)
+                {
+                    <span class="w-4 h-4 rounded-full bg-coral/20 text-coral border border-coral/30 text-[10px] flex items-center justify-center font-mono font-bold">
+                        @AppState.AllTodayItems.Count
+                    </span>
+                }
+            </a>
+
+            <!-- Command Bar launcher button -->
+            <button type="button"
+                    class="hidden sm:flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted hover:text-fg hover:bg-white/5 border border-white/5 transition"
+                    @onclick="() => AppState.ToggleCommandBar(true)"
+                    title="Open Command Bar">
+                <span class="font-mono text-[11px]">⌘K</span>
+            </button>
+
+            <!-- Quick New Item Button -->
+            <KeycapButton Size="sm"
+                          Text="+ Item"
+                          Shortcut="C"
+                          OnClick="HandleNewItemClick" />
+
+            <a href="/settings"
+               class="p-1.5 rounded-md text-muted hover:text-fg hover:bg-white/5 transition"
+               title="Project Settings">
+                ⚙
+            </a>
+        </div>
+    </div>
+</nav>
+
+@code {
+    private bool _isProjectDropdownOpen = false;
+
+    protected override void OnInitialized()
+    {
+        AppState.OnChange += StateHasChanged;
+        Nav.LocationChanged += (_, _) =>
+        {
+            _isProjectDropdownOpen = false;
+            StateHasChanged();
+        };
+    }
+
+    private void ToggleProjectDropdown() => _isProjectDropdownOpen = !_isProjectDropdownOpen;
+
+    private void SelectProject(Project project)
+    {
+        _isProjectDropdownOpen = false;
+        Dispatcher.SwitchProject(project.Id);
+    }
+
+    private void HandleNewProject()
+    {
+        _isProjectDropdownOpen = false;
+        Nav.NavigateTo("/settings?action=new-project");
+    }
+
+    private void HandleNewItemClick()
+    {
+        Dispatcher.TriggerNewItem();
+    }
+
+    private bool IsActiveView(string view)
+    {
+        var path = Nav.ToBaseRelativePath(Nav.Uri).ToLowerInvariant();
+        return path.Contains($"/{view}");
+    }
+
+    private bool IsActiveRoute(string route)
+    {
+        var path = "/" + Nav.ToBaseRelativePath(Nav.Uri).ToLowerInvariant();
+        return path.StartsWith(route.ToLowerInvariant());
+    }
+
+    public void Dispose()
+    {
+        AppState.OnChange -= StateHasChanged;
+    }
+}

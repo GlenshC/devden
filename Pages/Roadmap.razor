@@ -1,0 +1,234 @@
+@page "/p/{ProjectKey}/roadmap"
+@inject AppState AppState
+@inject ProjectService ProjectService
+@inject ItemService ItemService
+@implements IDisposable
+
+<PageTitle>Roadmap — @(AppState.ActiveProject?.Name ?? "DevDen")</PageTitle>
+
+@if (AppState.ActiveProject == null)
+{
+    <div class="py-12 text-center text-muted">
+        Loading roadmap...
+    </div>
+}
+else
+{
+    <div class="max-w-5xl mx-auto space-y-6">
+        <!-- Roadmap Header -->
+        <div class="flex items-center justify-between pb-2 border-b border-white/5">
+            <div>
+                <h1 class="text-xl font-bold text-fg flex items-center gap-2">
+                    <span>@AppState.ActiveProject.Name</span>
+                    <span class="text-xs font-mono text-muted bg-white/5 px-2 py-0.5 rounded border border-white/5">
+                        Roadmap
+                    </span>
+                </h1>
+                <p class="text-xs text-muted">
+                    @AppState.ActiveMilestones.Count active milestones
+                </p>
+            </div>
+
+            <KeycapButton Text="+ Milestone"
+                          Size="sm"
+                          OnClick="() => _isAddMilestoneOpen = true" />
+        </div>
+
+        <!-- Add Milestone Inline Form -->
+        @if (_isAddMilestoneOpen)
+        {
+            <div class="glass-panel p-4 rounded-panel border border-coral/30 animate-in fade-in duration-150">
+                <div class="flex items-center justify-between pb-2 mb-3 border-b border-white/5">
+                    <h3 class="text-sm font-semibold text-fg">Add Milestone</h3>
+                    <button type="button" class="text-muted hover:text-fg text-xs" @onclick="() => _isAddMilestoneOpen = false">✕</button>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="block text-[10px] font-mono uppercase text-muted mb-1">Name</label>
+                        <input type="text"
+                               class="w-full bg-white/5 border border-white/10 rounded-md px-3 py-1.5 text-xs text-fg focus:outline-none focus:border-coral/50"
+                               placeholder="e.g. v1.0 Public Release"
+                               @bind="_newMilestoneName" />
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-mono uppercase text-muted mb-1">Target Date</label>
+                        <input type="date"
+                               class="w-full bg-white/5 border border-white/10 rounded-md px-3 py-1.5 text-xs text-fg focus:outline-none focus:border-coral/50"
+                               @bind="_newMilestoneDate" />
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" class="text-xs text-muted hover:text-fg px-2 py-1" @onclick="() => _isAddMilestoneOpen = false">Cancel</button>
+                    <KeycapButton Text="Save Milestone" Size="sm" OnClick="SubmitAddMilestone" />
+                </div>
+            </div>
+        }
+
+        <!-- Milestones Sections -->
+        <div class="space-y-6">
+            @foreach (var milestone in AppState.ActiveMilestones)
+            {
+                var mItems = AppState.ActiveItems.Where(i => i.MilestoneId == milestone.Id).ToList();
+                var doneCount = mItems.Count(i => AppState.ActiveStatuses.FirstOrDefault(s => s.Id == i.StatusId)?.Category == StatusCategory.Done);
+                var totalCount = mItems.Count;
+                var progress = totalCount > 0 ? doneCount / (double)totalCount : 0.0;
+
+                <div class="glass-panel rounded-panel border border-hairline overflow-hidden shadow-lg">
+                    <!-- Milestone Header Card -->
+                    <div class="p-4 bg-white/[0.02] border-b border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="space-y-1">
+                            <div class="flex items-center gap-2.5">
+                                <span class="text-sm">🎯</span>
+                                <h3 class="text-base font-semibold text-fg">@milestone.Name</h3>
+                                <span class="text-[11px] font-mono px-2 py-0.5 rounded border @(milestone.State == MilestoneState.Open ? "bg-amber/10 text-amber border-amber/20" : "bg-muted/10 text-muted border-muted/20")">
+                                    @milestone.State
+                                </span>
+                            </div>
+
+                            <div class="flex items-center gap-3 text-xs text-muted font-mono">
+                                @if (milestone.TargetDate.HasValue)
+                                {
+                                    <span>Target: @milestone.TargetDate.Value.ToString("MMM dd, yyyy")</span>
+                                }
+                                <span>·</span>
+                                <span>@doneCount / @totalCount completed</span>
+                            </div>
+                        </div>
+
+                        <!-- Progress Bar & Actions -->
+                        <div class="w-full sm:w-64 space-y-1.5">
+                            <ProgressBar Value="@progress" Label="Milestone Burn-down" />
+                        </div>
+                    </div>
+
+                    <!-- Milestone Items List (Features first, then Tasks/Bugs) -->
+                    <div class="divide-y divide-white/5">
+                        @if (mItems.Count == 0)
+                        {
+                            <div class="p-4 text-center text-xs text-muted/50 italic">
+                                No items assigned to this milestone yet.
+                            </div>
+                        }
+                        else
+                        {
+                            var orderedItems = mItems
+                                .OrderByDescending(i => i.Type == ItemType.Feature)
+                                .ThenBy(i => i.Priority)
+                                .ToList();
+
+                            @foreach (var item in orderedItems)
+                            {
+                                var isDone = AppState.ActiveStatuses.FirstOrDefault(s => s.Id == item.StatusId)?.Category == StatusCategory.Done;
+
+                                <div class="px-4 py-2.5 flex items-center justify-between hover:bg-white/[0.02] transition cursor-pointer group text-xs @(isDone ? "opacity-60" : "")"
+                                     @onclick="() => AppState.SetSelectedItem(item)">
+                                    <div class="flex items-center gap-3 overflow-hidden">
+                                        <span class="font-mono text-muted group-hover:text-coral transition-colors flex-shrink-0">
+                                            @(AppState.ActiveProject?.Key ?? "DEN")-@item.Number
+                                        </span>
+                                        <Chip Type="@item.Type" Class="text-[10px] py-0 px-1" />
+                                        <span class="font-medium text-fg truncate @(isDone ? "line-through text-muted" : "")">
+                                            @item.Title
+                                        </span>
+                                    </div>
+
+                                    <div class="flex items-center gap-3 flex-shrink-0">
+                                        <Chip Priority="@item.Priority" Class="text-[10px] py-0 px-1.5" />
+                                        <span class="text-muted font-mono text-[11px]">
+                                            @(AppState.ActiveStatuses.FirstOrDefault(s => s.Id == item.StatusId)?.Name ?? "")
+                                        </span>
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+            }
+
+            <!-- Unscheduled Items Section -->
+            @{
+                var unscheduledItems = AppState.ActiveItems.Where(i => i.MilestoneId == null).ToList();
+            }
+            <div class="glass-panel rounded-panel border border-hairline overflow-hidden shadow-lg opacity-90">
+                <div class="p-4 bg-white/[0.01] border-b border-white/5 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-semibold text-muted flex items-center gap-2">
+                            <span>📦</span> Unscheduled Items (@unscheduledItems.Count)
+                        </h3>
+                    </div>
+                </div>
+
+                <div class="divide-y divide-white/5 max-h-64 overflow-y-auto">
+                    @if (unscheduledItems.Count == 0)
+                    {
+                        <div class="p-4 text-center text-xs text-muted/50 italic">
+                            All items are scheduled in milestones.
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var item in unscheduledItems)
+                        {
+                            <div class="px-4 py-2 flex items-center justify-between hover:bg-white/[0.02] transition cursor-pointer group text-xs"
+                                 @onclick="() => AppState.SetSelectedItem(item)">
+                                <div class="flex items-center gap-2.5 overflow-hidden">
+                                    <span class="font-mono text-muted group-hover:text-coral transition-colors">
+                                        @(AppState.ActiveProject?.Key ?? "DEN")-@item.Number
+                                    </span>
+                                    <span class="text-fg truncate">@item.Title</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <Chip Priority="@item.Priority" Class="text-[10px] py-0 px-1.5" />
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string ProjectKey { get; set; } = "";
+
+    private bool _isAddMilestoneOpen;
+    private string _newMilestoneName = "";
+    private DateTime? _newMilestoneDate;
+
+    protected override void OnInitialized()
+    {
+        AppState.OnChange += StateHasChanged;
+        SyncProject();
+    }
+
+    protected override void OnParametersSet()
+    {
+        SyncProject();
+    }
+
+    private void SyncProject()
+    {
+        if (!string.IsNullOrEmpty(ProjectKey))
+        {
+            AppState.SetActiveProjectByKey(ProjectKey);
+        }
+    }
+
+    private void SubmitAddMilestone()
+    {
+        if (!string.IsNullOrWhiteSpace(_newMilestoneName) && AppState.ActiveProjectId.HasValue)
+        {
+            DateOnly? date = _newMilestoneDate.HasValue ? DateOnly.FromDateTime(_newMilestoneDate.Value) : null;
+            ProjectService.AddMilestone(AppState.ActiveProjectId.Value, _newMilestoneName, date);
+            _newMilestoneName = "";
+            _newMilestoneDate = null;
+            _isAddMilestoneOpen = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        AppState.OnChange -= StateHasChanged;
+    }
+}

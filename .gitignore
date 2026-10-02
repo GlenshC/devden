@@ -2,4 +2,5 @@ bin/
 obj/
 .vs/
 *.user
+wwwroot/css/app.css
 node_modules/

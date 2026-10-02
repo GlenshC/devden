@@ -1,0 +1,151 @@
+@inject AppState AppState
+@inject ItemService ItemService
+
+<tr class="border-b border-white/5 hover:bg-white/[0.02] transition-colors group text-xs @(IsSelected ? "bg-coral/[0.04]" : "") @(IsDone ? "opacity-60" : "")">
+    <!-- Select Checkbox -->
+    <td class="px-3 py-2.5 w-8 text-center">
+        <input type="checkbox"
+               checked="@IsSelected"
+               class="rounded bg-white/5 border-white/20 text-coral focus:ring-0"
+               @onchange="HandleSelectionToggle"
+               @onclick:stopPropagation="true" />
+    </td>
+
+    <!-- Key & Type -->
+    <td class="px-3 py-2.5 whitespace-nowrap font-mono text-muted group-hover:text-coral transition-colors w-24 cursor-pointer"
+        @onclick="OpenDetail">
+        <div class="flex items-center gap-1.5">
+            <span>@(AppState.ActiveProject?.Key ?? "DEN")-@Item.Number</span>
+            <Chip Type="@Item.Type" Class="text-[10px] py-0 px-1" />
+        </div>
+    </td>
+
+    <!-- Title -->
+    <td class="px-3 py-2.5 text-fg font-medium max-w-md truncate cursor-pointer @(IsDone ? "line-through text-muted" : "")"
+        @onclick="OpenDetail">
+        <div class="flex items-center gap-2">
+            <span class="truncate">@Item.Title</span>
+            @if (Item.InToday)
+            {
+                <span class="text-coral flex-shrink-0 text-[10px]" title="In Today">⚡</span>
+            }
+            @if (Item.HasChecklist)
+            {
+                <span class="text-[10px] font-mono text-muted/60 flex-shrink-0">
+                    [@Item.CompletedChecklistCount/@Item.TotalChecklistCount]
+                </span>
+            }
+        </div>
+    </td>
+
+    <!-- Status -->
+    <td class="px-3 py-2.5 whitespace-nowrap w-36" @onclick:stopPropagation="true">
+        <select class="bg-transparent border border-transparent hover:border-white/10 rounded px-1.5 py-0.5 text-xs text-fg focus:outline-none focus:bg-[#121316] focus:border-coral/40"
+                value="@Item.StatusId"
+                @onchange="HandleStatusChange">
+            @foreach (var s in AppState.ActiveStatuses)
+            {
+                <option value="@s.Id">@s.Name</option>
+            }
+        </select>
+    </td>
+
+    <!-- Priority -->
+    <td class="px-3 py-2.5 whitespace-nowrap w-24" @onclick:stopPropagation="true">
+        <select class="bg-transparent border border-transparent hover:border-white/10 rounded px-1.5 py-0.5 text-xs text-fg focus:outline-none focus:bg-[#121316] focus:border-coral/40"
+                value="@Item.Priority"
+                @onchange="HandlePriorityChange">
+            @foreach (var p in Enum.GetValues<Priority>())
+            {
+                <option value="@p">@p</option>
+            }
+        </select>
+    </td>
+
+    <!-- Labels -->
+    <td class="px-3 py-2.5 whitespace-nowrap max-w-[140px] truncate" @onclick="OpenDetail">
+        <div class="flex items-center gap-1 overflow-hidden">
+            @if (Item.LabelIds.Count > 0 && AppState.ActiveProject != null)
+            {
+                var labels = AppState.ActiveLabels.Where(l => Item.LabelIds.Contains(l.Id)).ToList();
+                @foreach (var l in labels.Take(2))
+                {
+                    <span class="text-[10px] px-1.5 py-0.2 rounded border truncate max-w-[60px] @LabelColors.GetClass(l.ColorToken)">
+                        @l.Name
+                    </span>
+                }
+                @if (labels.Count > 2)
+                {
+                    <span class="text-[10px] font-mono text-muted/60">+@(labels.Count - 2)</span>
+                }
+            }
+        </div>
+    </td>
+
+    <!-- Milestone -->
+    <td class="px-3 py-2.5 whitespace-nowrap text-muted text-[11px] truncate max-w-[120px]" @onclick="OpenDetail">
+        @if (Item.MilestoneId.HasValue && AppState.ActiveMilestones.FirstOrDefault(m => m.Id == Item.MilestoneId.Value) is { } milestone)
+        {
+            <span>@milestone.Name</span>
+        }
+        else
+        {
+            <span class="text-muted/40">—</span>
+        }
+    </td>
+
+    <!-- Due Date -->
+    <td class="px-3 py-2.5 whitespace-nowrap font-mono text-[11px] w-24" @onclick="OpenDetail">
+        @if (Item.DueDate.HasValue)
+        {
+            <span class="@(IsOverdue ? "text-crimson font-bold" : "text-muted")">
+                @Item.DueDate.Value.ToString("MMM dd")
+            </span>
+        }
+        else
+        {
+            <span class="text-muted/40">—</span>
+        }
+    </td>
+
+    <!-- Updated -->
+    <td class="px-3 py-2.5 whitespace-nowrap font-mono text-[10px] text-muted/60 w-24 text-right" @onclick="OpenDetail">
+        @Item.UpdatedAt.ToLocalTime().ToString("MMM dd")
+    </td>
+</tr>
+
+@code {
+    [Parameter] public Item Item { get; set; } = default!;
+    [Parameter] public bool IsSelected { get; set; }
+    [Parameter] public EventCallback<bool> OnSelectedChanged { get; set; }
+
+    private bool IsDone => AppState.ActiveStatuses.FirstOrDefault(s => s.Id == Item.StatusId)?.Category == StatusCategory.Done;
+    private bool IsOverdue => Item.DueDate.HasValue && Item.DueDate.Value < DateOnly.FromDateTime(DateTime.Today) && !IsDone;
+
+    private void OpenDetail()
+    {
+        AppState.SetSelectedItem(Item);
+    }
+
+    private void HandleSelectionToggle(ChangeEventArgs e)
+    {
+        var selected = e.Value is true;
+        OnSelectedChanged.InvokeAsync(selected);
+    }
+
+    private void HandleStatusChange(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var sId))
+        {
+            ItemService.MoveItem(Item.Id, sId);
+        }
+    }
+
+    private void HandlePriorityChange(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<Priority>(e.Value?.ToString(), out var p))
+        {
+            ItemService.UpdateItem(Item.Id, new ItemPatch(Priority: p));
+        }
+    }
+}

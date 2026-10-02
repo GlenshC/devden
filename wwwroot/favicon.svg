@@ -1,4 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="7" fill="#07080a"/>
-  <text x="16" y="22" text-anchor="middle" font-family="monospace" font-size="14" font-weight="700" fill="#ff6b4a">D</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <linearGradient id="denGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffb347" />
+      <stop offset="50%" stop-color="#ff6b4a" />
+      <stop offset="100%" stop-color="#ff2f3a" />
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="8" fill="#07080a" stroke="rgba(255,255,255,0.1)" stroke-width="1" />
+  <path d="M9 8h7a7 7 0 0 1 7 7v2a7 7 0 0 1-7 7H9V8zm4 4v8h3a3 3 0 0 0 3-3v-2a3 3 0 0 0-3-3h-3z" fill="url(#denGradient)" />
 </svg>

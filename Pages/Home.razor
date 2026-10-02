@@ -1,19 +1,226 @@
 @page "/"
+@inject AppState AppState
+@inject ProjectService ProjectService
+@inject NavigationManager Nav
+@implements IDisposable
 
-<PageTitle>DevDen — Projects</PageTitle>
+<PageTitle>DevDen — Project Management for Developers</PageTitle>
 
-<div class="home-page">
-    <h1>My Projects</h1>
-    <p class="subtitle">Your developer workspace.</p>
+@if (AppState.Projects.Count == 0)
+{
+    <!-- Empty State: Full-bloom Aurora Hero -->
+    <div class="flex flex-col items-center justify-center min-h-[70vh] text-center px-4 relative z-10">
+        <div class="mb-8 flex items-center justify-center">
+            <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-amber via-coral to-crimson animate-pulse opacity-90 blur-md absolute"></div>
+            <div class="w-16 h-16 rounded-xl bg-[#07080a] flex items-center justify-center border-2 border-white/10 shadow-2xl relative z-10">
+                <span class="font-mono font-bold text-transparent bg-clip-text bg-gradient-to-br from-amber to-crimson text-2xl">DEN</span>
+            </div>
+        </div>
 
-    <div class="project-list">
-        <div class="project-card">
-            <div class="project-key">DEN</div>
-            <div class="project-name">DevDen</div>
-            <div class="project-meta">12 open items</div>
-            <a href="/board" class="btn-primary">Open</a>
+        <h1 class="hero-headline-accent mb-3">
+            Welcome to <span class="text-gradient-warm">DevDen</span>
+        </h1>
+
+        <p class="text-base text-muted max-w-md mb-8 leading-relaxed">
+            Project management built for developers. Kanban boards, milestone roadmaps, and a keyboard-driven workflow—all offline, zero backend.
+        </p>
+
+        <KeycapButton Text="Create Your First Project"
+                      Icon="＋"
+                      OnClick="OpenCreateProjectModal" />
+
+        <div class="mt-12 flex items-center gap-6 text-xs text-muted/60">
+            <div class="flex items-center gap-1.5">
+                <span class="kbd-chip text-[10px]">⌘K</span>
+                <span>Command Bar</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+                <span class="kbd-chip text-[10px]">C</span>
+                <span>New Item</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+                <span class="kbd-chip text-[10px]">ESC</span>
+                <span>Close Panel</span>
+            </div>
         </div>
     </div>
+}
+else
+{
+    <!-- Project Portfolio Grid -->
+    <div class="max-w-5xl mx-auto py-8">
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h1 class="text-2xl font-bold text-fg mb-1">Projects</h1>
+                <p class="text-sm text-muted">Choose a project to get started</p>
+            </div>
 
-    <button class="btn-primary mt">+ New Project</button>
-</div>
+            <KeycapButton Text="New Project"
+                          Icon="＋"
+                          OnClick="OpenCreateProjectModal" />
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            @foreach (var proj in AppState.Projects.OrderByDescending(p => p.CreatedAt))
+            {
+                var itemCount = AppState.ItemsByProject.TryGetValue(proj.Id, out var items) ? items.Count : 0;
+                var doneCount = items?.Count(i => AppState.ActiveStatuses.FirstOrDefault(s => s.Id == i.StatusId)?.Category == StatusCategory.Done) ?? 0;
+                var progress = itemCount > 0 ? doneCount / (double)itemCount : 0.0;
+
+                <a href="@($"/p/{proj.Key}/board")"
+                   class="glass-panel p-5 rounded-panel border border-hairline hover:border-white/20 transition-all hover:shadow-xl group cursor-pointer">
+                    <div class="flex items-start justify-between mb-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-amber via-coral to-crimson flex items-center justify-center font-mono font-bold text-sm text-black shadow-sm">
+                                @proj.Key.Substring(0, Math.Min(2, proj.Key.Length))
+                            </div>
+                            <div>
+                                <h3 class="text-base font-semibold text-fg group-hover:text-white transition-colors">
+                                    @proj.Name
+                                </h3>
+                                <span class="font-mono text-xs text-muted">@proj.Key</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(proj.Description))
+                    {
+                        <p class="text-xs text-muted/80 line-clamp-2 mb-3 leading-relaxed">
+                            @proj.Description
+                        </p>
+                    }
+
+                    <div class="pt-3 border-t border-white/5 space-y-2">
+                        <div class="flex items-center justify-between text-[11px] font-mono">
+                            <span class="text-muted">@itemCount items · @doneCount done</span>
+                            <span class="text-coral font-semibold">@(Math.Round(progress * 100))%</span>
+                        </div>
+                        <ProgressBar Value="@progress" ShowLabel="false" />
+                    </div>
+
+                    <div class="flex items-center gap-2 mt-3 text-[10px] text-muted/60">
+                        <span>@proj.Statuses.Count statuses</span>
+                        <span>·</span>
+                        <span>@proj.Labels.Count labels</span>
+                    </div>
+                </a>
+            }
+        </div>
+    </div>
+}
+
+<!-- Create Project Modal -->
+@if (_isCreateModalOpen)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150">
+        <div class="glass-panel w-full max-w-md p-6 shadow-2xl border border-hairline rounded-panel">
+            <div class="flex items-center justify-between pb-3 border-b border-white/5 mb-4">
+                <h3 class="text-base font-semibold text-fg">Create New Project</h3>
+                <button type="button" class="text-muted hover:text-fg text-sm" @onclick="CloseCreateModal">✕</button>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-mono text-muted uppercase tracking-wider mb-1.5">Project Name</label>
+                    <input type="text"
+                           class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-fg placeholder:text-muted/50 focus:outline-none focus:border-coral/50 transition"
+                           placeholder="e.g. DevDen Core, Mobile App, API"
+                           @bind="_newProjectName"
+                           @bind:event="oninput" />
+                </div>
+
+                <div>
+                    <label class="block text-xs font-mono text-muted uppercase tracking-wider mb-1.5">Project Key (2-5 uppercase letters)</label>
+                    <input type="text"
+                           class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-fg placeholder:text-muted/50 focus:outline-none focus:border-coral/50 font-mono uppercase transition"
+                           placeholder="e.g. DEN, APP, API"
+                           maxlength="5"
+                           @bind="_newProjectKey"
+                           @bind:event="oninput" />
+                    @if (!string.IsNullOrWhiteSpace(_keyError))
+                    {
+                        <p class="text-xs text-crimson mt-1">@_keyError</p>
+                    }
+                </div>
+
+                <div>
+                    <label class="block text-xs font-mono text-muted uppercase tracking-wider mb-1.5">Description (Optional)</label>
+                    <textarea class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-fg placeholder:text-muted/50 focus:outline-none focus:border-coral/50 resize-none transition"
+                              rows="3"
+                              placeholder="Brief project description..."
+                              @bind="_newProjectDescription"
+                              @bind:event="oninput">
+                    </textarea>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-3 border-t border-white/5">
+                    <button type="button"
+                            class="px-3 py-1.5 text-xs text-muted hover:text-fg hover:bg-white/5 rounded-lg transition"
+                            @onclick="CloseCreateModal">
+                        Cancel
+                    </button>
+                    <KeycapButton Text="Create Project"
+                                  Shortcut="Enter"
+                                  OnClick="SubmitCreateProject" />
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _isCreateModalOpen;
+    private string _newProjectName = "";
+    private string _newProjectKey = "";
+    private string _newProjectDescription = "";
+    private string _keyError = "";
+
+    protected override void OnInitialized()
+    {
+        AppState.OnChange += StateHasChanged;
+    }
+
+    private void OpenCreateProjectModal()
+    {
+        _isCreateModalOpen = true;
+        _newProjectName = "";
+        _newProjectKey = "";
+        _newProjectDescription = "";
+        _keyError = "";
+    }
+
+    private void CloseCreateModal()
+    {
+        _isCreateModalOpen = false;
+    }
+
+    private void SubmitCreateProject()
+    {
+        _keyError = "";
+
+        var result = ProjectService.CreateProject(_newProjectName, _newProjectKey);
+        if (result.IsSuccess)
+        {
+            var project = result.Value!;
+            _isCreateModalOpen = false;
+
+            // Update project description if provided
+            if (!string.IsNullOrWhiteSpace(_newProjectDescription))
+            {
+                ProjectService.UpdateProject(project.Id, project.Name, _newProjectDescription.Trim());
+            }
+
+            // Navigate to Board
+            Nav.NavigateTo($"/p/{project.Key}/board");
+        }
+        else
+        {
+            _keyError = result.ErrorMessage ?? "Failed to create project";
+        }
+    }
+
+    public void Dispose()
+    {
+        AppState.OnChange -= StateHasChanged;
+    }
+}

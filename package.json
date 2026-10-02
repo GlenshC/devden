@@ -1,0 +1,13 @@
+{
+  "name": "devden",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DevDen - Developer Project Management SPA in Blazor WASM",
+  "scripts": {
+    "css:build": "tailwindcss -i ./wwwroot/css/tailwind.input.css -o ./wwwroot/css/app.css --minify",
+    "css:watch": "tailwindcss -i ./wwwroot/css/tailwind.input.css -o ./wwwroot/css/app.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.17"
+  }
+}

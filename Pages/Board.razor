@@ -1,111 +1,94 @@
-@page "/board"
+@page "/p/{ProjectKey}/board"
+@inject AppState AppState
+@inject ItemService ItemService
+@inject NavigationManager Nav
+@implements IDisposable
 
-<PageTitle>Board — DevDen</PageTitle>
+<PageTitle>Board — @(AppState.ActiveProject?.Name ?? "DevDen")</PageTitle>
 
-<div class="board-page">
-    <div class="board-header">
-        <h1>DEN — DevDen</h1>
-        <button class="btn-primary">+ New Item</button>
+@if (AppState.ActiveProject == null)
+{
+    <div class="py-12 text-center text-muted">
+        Loading project board...
+    </div>
+}
+else
+{
+    <!-- Board Header -->
+    <div class="flex items-center justify-between mb-4">
+        <div>
+            <h1 class="text-xl font-bold text-fg flex items-center gap-2">
+                <span>@AppState.ActiveProject.Name</span>
+                <span class="text-xs font-mono text-muted bg-white/5 px-2 py-0.5 rounded border border-white/5">
+                    Board
+                </span>
+            </h1>
+            <p class="text-xs text-muted">
+                @AppState.ActiveItems.Count total items · @(AppState.ActiveItems.Count(i => AppState.ActiveStatuses.FirstOrDefault(s => s.Id == i.StatusId)?.Category == StatusCategory.Done)) done
+            </p>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <span class="hidden sm:inline text-xs text-muted/60 font-mono">
+                Drag cards to reorder or change status
+            </span>
+        </div>
     </div>
 
-    <div class="board-columns">
-        <div class="board-column">
-            <div class="column-header">
-                <span class="column-name">Backlog</span>
-                <span class="column-count">3</span>
-            </div>
+    <!-- Kanban Columns Scroll Container -->
+    <div class="flex items-start gap-4 overflow-x-auto pb-6 pt-1">
+        @foreach (var status in AppState.ActiveStatuses.OrderBy(s => s.Order))
+        {
+            var columnItems = AppState.ActiveItems.Where(i => i.StatusId == status.Id).OrderBy(i => i.Order).ToList();
 
-            <div class="item-card">
-                <div class="item-key">DEN-1</div>
-                <div class="item-title">Set up project structure and routing</div>
-                <div class="item-meta">
-                    <span class="priority-dot p2"></span>
-                    <span class="item-type">Task</span>
-                </div>
-            </div>
-
-            <div class="item-card">
-                <div class="item-key">DEN-2</div>
-                <div class="item-title">Design data models for projects and items</div>
-                <div class="item-meta">
-                    <span class="priority-dot p1"></span>
-                    <span class="item-type">Feature</span>
-                </div>
-            </div>
-
-            <div class="item-card">
-                <div class="item-key">DEN-3</div>
-                <div class="item-title">Research localStorage vs IndexedDB for persistence</div>
-                <div class="item-meta">
-                    <span class="priority-dot p3"></span>
-                    <span class="item-type">Chore</span>
-                </div>
-            </div>
-
-            <button class="btn-add-item">+ Add item</button>
-        </div>
-
-        <div class="board-column">
-            <div class="column-header">
-                <span class="column-name">In Progress</span>
-                <span class="column-count">2</span>
-            </div>
-
-            <div class="item-card">
-                <div class="item-key">DEN-4</div>
-                <div class="item-title">Build kanban board UI with static data</div>
-                <div class="item-meta">
-                    <span class="priority-dot p1"></span>
-                    <span class="item-type">Feature</span>
-                </div>
-            </div>
-
-            <div class="item-card">
-                <div class="item-key">DEN-5</div>
-                <div class="item-title">Write plain CSS design tokens</div>
-                <div class="item-meta">
-                    <span class="priority-dot p2"></span>
-                    <span class="item-type">Chore</span>
-                </div>
-            </div>
-
-            <button class="btn-add-item">+ Add item</button>
-        </div>
-
-        <div class="board-column">
-            <div class="column-header">
-                <span class="column-name">Review</span>
-                <span class="column-count">1</span>
-            </div>
-
-            <div class="item-card">
-                <div class="item-key">DEN-6</div>
-                <div class="item-title">Verify Blazor WASM build output and asset pipeline</div>
-                <div class="item-meta">
-                    <span class="priority-dot p0"></span>
-                    <span class="item-type">Bug</span>
-                </div>
-            </div>
-
-            <button class="btn-add-item">+ Add item</button>
-        </div>
-
-        <div class="board-column">
-            <div class="column-header">
-                <span class="column-name">Done</span>
-                <span class="column-count">1</span>
-            </div>
-
-            <div class="item-card done">
-                <div class="item-key">DEN-0</div>
-                <div class="item-title">Bootstrap Blazor WASM project</div>
-                <div class="item-meta">
-                    <span class="priority-dot p3"></span>
-                    <span class="item-type">Chore</span>
-                </div>
-            </div>
-
-            <button class="btn-add-item">+ Add item</button>
-        </div>
+            <StatusColumn Status="@status"
+                          Items="@columnItems"
+                          OnDraggingStarted="HandleDraggingStarted"
+                          OnItemDropped="HandleItemDropped" />
+        }
     </div>
-</div>
+}
+
+@code {
+    [Parameter] public string ProjectKey { get; set; } = "";
+
+    private Item? _draggingItem;
+
+    protected override void OnInitialized()
+    {
+        AppState.OnChange += StateHasChanged;
+        SyncProject();
+    }
+
+    protected override void OnParametersSet()
+    {
+        SyncProject();
+    }
+
+    private void SyncProject()
+    {
+        if (!string.IsNullOrEmpty(ProjectKey))
+        {
+            AppState.SetActiveProjectByKey(ProjectKey);
+        }
+    }
+
+    private void HandleDraggingStarted(Item item)
+    {
+        _draggingItem = item;
+    }
+
+    private void HandleItemDropped((Guid ItemId, Guid TargetStatusId, Guid? BeforeItemId) dropData)
+    {
+        if (_draggingItem == null) return;
+
+        // Perform move
+        ItemService.MoveItem(_draggingItem.Id, dropData.TargetStatusId, dropData.BeforeItemId);
+        _draggingItem = null;
+    }
+
+    public void Dispose()
+    {
+        AppState.OnChange -= StateHasChanged;
+    }
+}
