@@ -5,6 +5,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ServiceWorkerAssetsManifest>service-worker-assets.js</ServiceWorkerAssetsManifest>
+    <PublishTrimmed>true</PublishTrimmed>
+    <InvariantGlobalization>true</InvariantGlobalization>
+   <BlazorEnableCompression>true</BlazorEnableCompression>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,9 +16,8 @@
     <PackageReference Include="Markdig" Version="0.40.0" />
   </ItemGroup>
 
-  <!-- Optional Tailwind CSS compile on Build if npx/tailwindcss is available -->
-  <Target Name="BuildTailwind" BeforeTargets="BeforeBuild" Condition="'$(Configuration)' == 'Release' or Exists('node_modules')">
-    <Exec Command="npx tailwindcss -i ./wwwroot/css/tailwind.input.css -o ./wwwroot/css/app.css --minify" ContinueOnError="true" />
+  <Target Name="BuildTailwind" BeforeTargets="BeforeBuild" Condition="'$(Configuration)' == 'Release'">
+    <Exec Command="npx @tailwindcss/cli -i ./wwwroot/css/tailwind.input.css -o ./wwwroot/css/app.css --minify" ContinueOnError="true" />
   </Target>
 
 </Project>
