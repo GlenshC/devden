@@ -1,0 +1,66 @@
+@page "/item/{Number}"
+
+<PageTitle>@Number — DevDen</PageTitle>
+
+<div class="item-detail-overlay" @onclick="CloseDetail">
+    <div class="item-detail-panel" @onclick:stopPropagation="true">
+        <div class="detail-header">
+            <div class="detail-key">DEN-@Number</div>
+            <button class="btn-ghost close-btn" @onclick="CloseDetail">✕</button>
+        </div>
+
+        <div class="detail-body">
+            <input type="text" class="detail-title-input" value="Sample item title" />
+
+            <div class="detail-section">
+                <label>Description</label>
+                <textarea class="detail-textarea" rows="8" placeholder="Add a description..."></textarea>
+            </div>
+
+            <div class="detail-sidebar">
+                <div class="detail-field">
+                    <label>Status</label>
+                    <select class="detail-select">
+                        <option>Backlog</option>
+                        <option>In Progress</option>
+                        <option>Review</option>
+                        <option>Done</option>
+                    </select>
+                </div>
+
+                <div class="detail-field">
+                    <label>Priority</label>
+                    <select class="detail-select">
+                        <option>P0</option>
+                        <option>P1</option>
+                        <option>P2</option>
+                        <option>P3</option>
+                    </select>
+                </div>
+
+                <div class="detail-field">
+                    <label>Type</label>
+                    <select class="detail-select">
+                        <option>Task</option>
+                        <option>Bug</option>
+                        <option>Feature</option>
+                        <option>Chore</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string Number { get; set; } = "1";
+
+    [Inject]
+    private NavigationManager Nav { get; set; } = default!;
+
+    private void CloseDetail()
+    {
+        Nav.NavigateTo("/board");
+    }
+}

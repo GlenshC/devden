@@ -321,6 +321,222 @@ a {
     color: var(--fg-muted);
 }
 
+/* List View */
+.list-page h1 {
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.item-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.item-table thead {
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+}
+
+.item-table th {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--fg-muted);
+}
+
+.item-table td {
+    padding: 12px 14px;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+}
+
+.cell-key {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--fg-muted);
+}
+
+.cell-title {
+    font-weight: 500;
+}
+
+.cell-title.done {
+    text-decoration: line-through;
+    color: var(--fg-muted);
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.status-badge.backlog {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--fg-muted);
+}
+
+.status-badge.active {
+    background: rgba(255, 179, 71, 0.15);
+    color: var(--amber);
+}
+
+.status-badge.review {
+    background: rgba(255, 107, 74, 0.15);
+    color: var(--coral);
+}
+
+.status-badge.done {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--fg-muted);
+}
+
+.type-badge {
+    font-size: 10px;
+    color: var(--fg-muted);
+    background: rgba(255, 255, 255, 0.06);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+/* Item Detail */
+.item-detail-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.item-detail-panel {
+    width: 90%;
+    max-width: 640px;
+    max-height: 90vh;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow-y: auto;
+}
+
+.detail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.detail-key {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--fg-muted);
+    font-weight: 600;
+}
+
+.close-btn {
+    padding: 4px 8px;
+    font-size: 16px;
+}
+
+.detail-body {
+    padding: 20px;
+}
+
+.detail-title-input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: var(--fg);
+    font-size: 18px;
+    font-weight: 600;
+    font-family: var(--font-sans);
+    margin-bottom: 16px;
+    padding: 4px 0;
+}
+
+.detail-title-input:focus {
+    outline: none;
+}
+
+.detail-section {
+    margin-bottom: 20px;
+}
+
+.detail-section label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--fg-muted);
+    margin-bottom: 8px;
+}
+
+.detail-textarea {
+    width: 100%;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--fg);
+    font-size: 13px;
+    font-family: var(--font-sans);
+    padding: 10px;
+    resize: vertical;
+}
+
+.detail-textarea:focus {
+    outline: none;
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.detail-sidebar {
+    display: grid;
+    gap: 14px;
+}
+
+.detail-field label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--fg-muted);
+    margin-bottom: 6px;
+}
+
+.detail-select {
+    width: 100%;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--fg);
+    font-size: 13px;
+    font-family: var(--font-sans);
+    padding: 7px 10px;
+}
+
+.detail-select:focus {
+    outline: none;
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
 /* Error UI */
 #blazor-error-ui {
     display: none;

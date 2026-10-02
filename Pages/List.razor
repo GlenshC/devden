@@ -1,0 +1,73 @@
+@page "/list"
+
+<PageTitle>List — DevDen</PageTitle>
+
+<div class="list-page">
+    <div class="list-header">
+        <h1>DEN — All Items</h1>
+        <button class="btn-primary">+ New Item</button>
+    </div>
+
+    <table class="item-table">
+        <thead>
+            <tr>
+                <th>Key</th>
+                <th>Title</th>
+                <th>Status</th>
+                <th>Priority</th>
+                <th>Type</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="cell-key">DEN-0</td>
+                <td class="cell-title done">Bootstrap Blazor WASM project</td>
+                <td><span class="status-badge done">Done</span></td>
+                <td><span class="priority-dot p3"></span></td>
+                <td><span class="type-badge">Chore</span></td>
+            </tr>
+            <tr>
+                <td class="cell-key">DEN-1</td>
+                <td class="cell-title">Set up project structure and routing</td>
+                <td><span class="status-badge backlog">Backlog</span></td>
+                <td><span class="priority-dot p2"></span></td>
+                <td><span class="type-badge">Task</span></td>
+            </tr>
+            <tr>
+                <td class="cell-key">DEN-2</td>
+                <td class="cell-title">Design data models for projects and items</td>
+                <td><span class="status-badge backlog">Backlog</span></td>
+                <td><span class="priority-dot p1"></span></td>
+                <td><span class="type-badge">Feature</span></td>
+            </tr>
+            <tr>
+                <td class="cell-key">DEN-3</td>
+                <td class="cell-title">Research localStorage vs IndexedDB for persistence</td>
+                <td><span class="status-badge backlog">Backlog</span></td>
+                <td><span class="priority-dot p3"></span></td>
+                <td><span class="type-badge">Chore</span></td>
+            </tr>
+            <tr>
+                <td class="cell-key">DEN-4</td>
+                <td class="cell-title">Build kanban board UI with static data</td>
+                <td><span class="status-badge active">In Progress</span></td>
+                <td><span class="priority-dot p1"></span></td>
+                <td><span class="type-badge">Feature</span></td>
+            </tr>
+            <tr>
+                <td class="cell-key">DEN-5</td>
+                <td class="cell-title">Write plain CSS design tokens</td>
+                <td><span class="status-badge active">In Progress</span></td>
+                <td><span class="priority-dot p2"></span></td>
+                <td><span class="type-badge">Chore</span></td>
+            </tr>
+            <tr>
+                <td class="cell-key">DEN-6</td>
+                <td class="cell-title">Verify Blazor WASM build output and asset pipeline</td>
+                <td><span class="status-badge review">Review</span></td>
+                <td><span class="priority-dot p0"></span></td>
+                <td><span class="type-badge">Bug</span></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
